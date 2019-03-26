@@ -1,7 +1,9 @@
 use structopt::StructOpt;
 use rand::Rng;
+use rolldice::RollResult;
 
-#[derive(StructOpt)]
+#[derive(StructOpt, Debug)]
+#[structopt(name = "rolldice", bin_name = "rolldice", about = "Rolls some numbers of 6 sided dice.")]
 struct Config {
     #[structopt(short = "n", help = "Number of dice", default_value = "1")]
     number_of_dice: u16,
@@ -10,18 +12,30 @@ struct Config {
     dice_per_row: u16,
 }
 
+fn print_row(rolls: &[RollResult]) {
+    let formatted: Vec<_> = rolls.iter().map(|roll| format!("{}", roll)).collect();
+    let iters: Vec<_> = formatted.iter().map(|s| s.lines()).collect();
+    for lines in iters {
+        for line in lines {
+            println!("{}", line);
+        }
+    }
+}
+
 fn main() {
     let config = Config::from_args();
     if config.dice_per_row == 0 {
+        eprintln!("--rowsize must be greater than 0");
         std::process::exit(1);
     }
 
     let mut rng = rand::thread_rng();
-    let mut rolls: Vec<u32> = Vec::new();
+    let mut rolls = Vec::new();
     for _ in 0..config.number_of_dice {
-        rolls.push((rng.gen::<u32>() % 6) + 1);
+        rolls.push(rng.gen());
     }
+
     for group in rolls.chunks(config.dice_per_row as usize) {
-        println!("{:?}", group);
+        print_row(group);
     }
 }
