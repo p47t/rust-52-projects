@@ -2,7 +2,7 @@ use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use std::fmt::{Display, Formatter, Error};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RollResult {
     One,
     Two,
@@ -12,16 +12,22 @@ pub enum RollResult {
     Six,
 }
 
-impl Distribution<RollResult> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RollResult {
-        match rng.gen_range(0, 6) {
-            0 => RollResult::One,
-            1 => RollResult::Two,
-            2 => RollResult::Three,
-            3 => RollResult::Four,
-            4 => RollResult::Five,
+impl RollResult {
+    fn from(i: u32) -> RollResult {
+        match i {
+            1 => RollResult::One,
+            2 => RollResult::Two,
+            3 => RollResult::Three,
+            4 => RollResult::Four,
+            5 => RollResult::Five,
             _ => RollResult::Six,
         }
+    }
+}
+
+impl Distribution<RollResult> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RollResult {
+        RollResult::from(rng.gen_range(1, 7))
     }
 }
 
@@ -118,5 +124,57 @@ mod tests {
 |   |
 +---+";
         assert_eq!(format!("{}", RollResult::One), expected);
+        let expected = "\
++---+
+|  *|
+|   |
+|*  |
++---+";
+        assert_eq!(format!("{}", RollResult::Two), expected);
+        let expected = "\
++---+
+|  *|
+| * |
+|*  |
++---+";
+        assert_eq!(format!("{}", RollResult::Three), expected);
+        let expected = "\
++---+
+|* *|
+|   |
+|* *|
++---+";
+        assert_eq!(format!("{}", RollResult::Four), expected);
+        let expected = "\
++---+
+|* *|
+| * |
+|* *|
++---+";
+        assert_eq!(format!("{}", RollResult::Five), expected);
+        let expected = "\
++---+
+|* *|
+|* *|
+|* *|
++---+";
+        assert_eq!(format!("{}", RollResult::Six), expected);
+    }
+
+    #[test]
+    fn test_multizip() {
+        let vecs = vec![
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9],
+        ];
+        let iters = vecs.iter().map(|v| v.iter()).collect();
+        let mut zipped = multizip(iters).into_iter();
+        let line = zipped.next().unwrap();
+        assert_eq!(line.as_slice(), &[&1, &4, &7]);
+        let line = zipped.next().unwrap();
+        assert_eq!(line.as_slice(), &[&2, &5, &8]);
+        let line = zipped.next().unwrap();
+        assert_eq!(line.as_slice(), &[&3, &6, &9]);
     }
 }
