@@ -1,6 +1,6 @@
 use structopt::StructOpt;
 use rand::Rng;
-use rolldice::RollResult;
+use rolldice::{RollResult, multizip};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "rolldice", bin_name = "rolldice", about = "Rolls some numbers of 6 sided dice.")]
@@ -15,10 +15,8 @@ struct Config {
 fn print_row(rolls: &[RollResult]) {
     let formatted: Vec<_> = rolls.iter().map(|roll| format!("{}", roll)).collect();
     let iters: Vec<_> = formatted.iter().map(|s| s.lines()).collect();
-    for lines in iters {
-        for line in lines {
-            println!("{}", line);
-        }
+    for line in multizip(iters) {
+        println!("{}", line.as_slice().join(" "));
     }
 }
 

@@ -79,9 +79,35 @@ impl Display for RollResult {
     }
 }
 
+pub struct MultiZip<I> {
+    iters: Vec<I>,
+}
+
+pub fn multizip<I: Iterator>(iters: Vec<I>) -> MultiZip<I> {
+    MultiZip { iters }
+}
+
+impl<I: Iterator> Iterator for MultiZip<I> {
+    type Item = Vec<I::Item>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iters.iter_mut().map(|iter| iter.next()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::RollResult;
+    use crate::{RollResult, multizip};
+
+    #[test]
+    fn dice_from_number() {
+        assert_eq!(RollResult::from(1), RollResult::One);
+        assert_eq!(RollResult::from(2), RollResult::Two);
+        assert_eq!(RollResult::from(3), RollResult::Three);
+        assert_eq!(RollResult::from(4), RollResult::Four);
+        assert_eq!(RollResult::from(5), RollResult::Five);
+        assert_eq!(RollResult::from(6), RollResult::Six);
+    }
 
     #[test]
     fn format_die_one() {
