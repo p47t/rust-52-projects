@@ -15,6 +15,9 @@ fn main() -> std::io::Result<()> {
         "recv" => {
             Client::new().recv("", DEFAULT_SERVER_ADDR)?;
         }
+        "serve" => {
+            Server::new().serve(DEFAULT_SERVER_ADDR)?;
+        }
         "" => {
             println!("no command is given.");
         }

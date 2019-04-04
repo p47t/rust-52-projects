@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use crate::tftp::{Sender, Receiver};
+use crate::tftp::{Sender, Receiver, Packet};
 
 pub struct Client {}
 
@@ -9,13 +9,13 @@ impl Client {
     }
 
     pub fn send(&self, file: &str, to: &str) -> std::io::Result<()> {
-        let sender = Sender::new(file);
+        let _sender = Sender::new(file);
         self.connect(to)?;
         Ok(())
     }
 
     pub fn recv(&self, file: &str, from: &str) -> std::io::Result<()> {
-        let receiver = Receiver::new(file);
+        let _receiver = Receiver::new(file);
         self.connect(from)?;
         Ok(())
     }
@@ -26,7 +26,11 @@ impl Client {
 
         let mut buf = [0u8; 10];
         loop {
-            socket.send(&buf)?;
+            let packet = Packet::generate(&Packet::ReadRequest {
+                filename: "".to_owned(),
+                mode: "".to_owned(),
+            });
+            socket.send(packet.as_slice())?;
             socket.recv(&mut buf)?;
         }
     }

@@ -5,3 +5,4 @@ authors = ["Patrick Tsai <patrick@simplypatrick.com>"]
 edition = "2018"
 
 [dependencies]
+bytes = "0.4.12"
