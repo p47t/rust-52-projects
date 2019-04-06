@@ -1,8 +1,14 @@
 use bytes::{Buf, BufMut, BytesMut};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
+use std::fs::File;
 
 enum OpCode {
-    Rrq = 1, Wrq, Data, Ack, Error, Invalid
+    Rrq = 1,
+    Wrq,
+    Data,
+    Ack,
+    Error,
+    Invalid,
 }
 
 impl OpCode {
@@ -138,46 +144,45 @@ fn read_cstr(cursor: &mut Cursor<&[u8]>) -> String {
 }
 
 pub trait Processor {
-    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()>;
+    fn process(&mut self, packet: &Packet) -> Option<Packet>;
     fn done(&self) -> bool;
 }
 
 pub struct Receiver {
     current_block: u16,
     done: bool,
+    file: std::fs::File,
 }
 
 impl Receiver {
-    pub fn new(_file: &str) -> Receiver {
-        Receiver {
+    pub fn new(path: &str) -> std::io::Result<Receiver> {
+        Ok(Receiver {
             current_block: 0,
             done: false,
-        }
+            file: File::create(path)?
+        })
     }
 }
 
 impl Processor for Receiver {
-    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
+    fn process(&mut self, packet: &Packet) -> Option<Packet> {
         match packet {
             Packet::WriteRequest { .. } => {
-                Ok(Some(Packet::Ack { block_num: 0 }))
+                Some(Packet::Ack { block_num: 0 })
             }
             Packet::Data { block_num, data } => {
                 if *block_num != self.current_block + 1 {
-                    return Err(());
+                    return None;
                 }
                 self.current_block = *block_num;
-
-                // TODO: write data to file
+                let _ = self.file.write(data);
                 if data.len() < 512 {
                     self.done = true;
                 }
 
-                Ok(Some(Packet::Ack { block_num: *block_num }))
+                Some(Packet::Ack { block_num: *block_num })
             }
-            _ => {
-                Err(())
-            }
+            _ => None
         }
     }
 
@@ -187,40 +192,50 @@ impl Processor for Receiver {
 pub struct Sender {
     current_block: u16,
     done: bool,
+    file: std::fs::File,
 }
 
 impl Sender {
-    pub fn new(_file: &str) -> Sender {
-        Sender {
+    pub fn new(path: &str) -> std::io::Result<Sender> {
+        Ok(Sender {
             current_block: 0,
             done: false,
+            file: File::open(path)?,
+        })
+    }
+
+    pub fn next_block(&mut self) -> std::io::Result<Packet> {
+        let mut data = vec![0; 512];
+        let size = self.file.read(data.as_mut_slice())?;
+        self.current_block += 1;
+        if size < 512 {
+            self.done = true;
         }
+        Ok(Packet::Data {
+            block_num: self.current_block,
+            data: data[..size].to_vec(),
+        })
     }
 }
 
 impl Processor for Sender {
-    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
+    fn process(&mut self, packet: &Packet) -> Option<Packet> {
         match packet {
             Packet::ReadRequest { .. } => {
-                Ok(Some(Packet::Ack { block_num: 0 }))
+                if let Ok(packet) = self.next_block() {
+                    return Some(packet)
+                }
+                None
             }
             Packet::Ack { block_num } => {
                 if *block_num == self.current_block {
-                    // TODO: read data from file
-                    let data = vec![0u8];
-                    self.current_block += 1;
-                    if data.len() < 512 {
-                        self.done = true;
+                    if let Ok(packet) = self.next_block() {
+                        return Some(packet)
                     }
-
-                    Ok(Some(Packet::Data { block_num: self.current_block, data }))
-                } else {
-                    Err(())
                 }
+                None
             }
-            _ => {
-                Err(())
-            }
+            _ => None
         }
     }
 
@@ -231,6 +246,11 @@ impl Processor for Sender {
 mod tests {
     use super::*;
 
+    const INPUT: &str = "rfc1350.txt";
+    const OUTPUT: &str = "rfc1350-received.txt";
+    const MODE: &str = "octet";
+    const CONTENT: &str = "TFTP";
+
     #[test]
     fn test_packet_parse() {
         let bytes = [
@@ -240,8 +260,8 @@ mod tests {
         ];
         assert_eq!(Packet::from(&bytes),
                    Some(Packet::ReadRequest {
-                       filename: "rfc1350.txt".to_owned(),
-                       mode: "octet".to_owned(),
+                       filename: INPUT.to_owned(),
+                       mode: MODE.to_owned(),
                    }));
 
         let bytes = [
@@ -251,8 +271,8 @@ mod tests {
         ];
         assert_eq!(Packet::from(&bytes),
                    Some(Packet::WriteRequest {
-                       filename: "rfc1350.txt".to_owned(),
-                       mode: "octet".to_owned(),
+                       filename: INPUT.to_owned(),
+                       mode: MODE.to_owned(),
                    }));
 
         let bytes = [
@@ -295,8 +315,8 @@ mod tests {
             0x6f, 0x63, 0x74, 0x65, 0x74, 0x00
         ];
         assert_eq!(Packet::ReadRequest {
-            filename: "rfc1350.txt".to_owned(),
-            mode: "octet".to_owned(),
+            filename: INPUT.to_owned(),
+            mode: MODE.to_owned(),
         }.to_bytes(), bytes);
 
         let bytes = [
@@ -305,8 +325,8 @@ mod tests {
             0x6f, 0x63, 0x74, 0x65, 0x74, 0x00
         ];
         assert_eq!(Packet::WriteRequest {
-            filename: "rfc1350.txt".to_owned(),
-            mode: "octet".to_owned(),
+            filename: INPUT.to_owned(),
+            mode: MODE.to_owned(),
         }.to_bytes(), bytes);
 
         let bytes = [
@@ -340,29 +360,63 @@ mod tests {
 
     #[test]
     fn test_receiver() {
-        let mut receiver = Receiver::new("rfc1350.txt");
+        let mut receiver = Receiver::new(OUTPUT).unwrap();
         assert!(!receiver.done());
 
         let reply = receiver.process(&Packet::Ack { block_num: 0 });
-        assert_eq!(reply, Err(()));
+        assert_eq!(reply, None);
         assert!(!receiver.done());
 
-        let reply = receiver.process(&Packet::Data { block_num: 2, data: vec![0u8] });
-        assert_eq!(reply, Err(()));
+        let reply = receiver.process(&Packet::Data { block_num: 2, data: vec![] });
+        assert_eq!(reply, None);
         assert!(!receiver.done());
 
-        let reply = receiver.process(&Packet::Data { block_num: 1, data: vec![0u8] });
-        assert_eq!(reply, Ok(Some(Packet::Ack { block_num: 1 })));
+        let reply = receiver.process(&Packet::Data { block_num: 1, data: vec![] });
+        assert_eq!(reply, Some(Packet::Ack { block_num: 1 }));
         assert!(receiver.done());
     }
 
     #[test]
     fn test_sender() {
-        let mut sender = Sender::new("rfc1350.txt");
+        let mut sender = Sender::new(INPUT).unwrap();
         assert!(!sender.done());
 
         let reply = sender.process(&Packet::Ack { block_num: 0 });
-        assert_eq!(reply, Ok(Some(Packet::Data { block_num: 1, data: vec![0u8] })));
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
         assert!(sender.done());
+    }
+
+    #[test]
+    fn test_sender_receiver() {
+        let mut sender = Sender::new(INPUT).unwrap();
+        let mut receiver = Receiver::new(OUTPUT).unwrap();
+
+        let reply = receiver.process(&Packet::WriteRequest {
+            filename: OUTPUT.to_string(),
+            mode: MODE.to_string(),
+        });
+        assert_eq!(reply, Some(Packet::Ack { block_num: 0 }));
+        let reply = sender.process(&reply.unwrap());
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
+        assert!(sender.done());
+        let reply = receiver.process(&reply.unwrap());
+        assert_eq!(reply, Some(Packet::Ack { block_num: 1 }));
+        assert!(receiver.done());
+    }
+
+    #[test]
+    fn test_receiver_sender() {
+        let mut sender = Sender::new(INPUT).unwrap();
+        let mut receiver = Receiver::new(OUTPUT).unwrap();
+
+        let reply = sender.process(&Packet::ReadRequest {
+            filename: INPUT.to_string(),
+            mode: MODE.to_string(),
+        });
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
+        assert!(sender.done());
+        let reply = receiver.process(&reply.unwrap());
+        assert_eq!(reply, Some(Packet::Ack { block_num: 1 }));
+        assert!(receiver.done());
     }
 }

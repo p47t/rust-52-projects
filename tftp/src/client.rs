@@ -10,7 +10,7 @@ impl Client {
     }
 
     pub fn upload(&self, file: &str, to: &str) -> io::Result<()> {
-        let mut sender = Sender::new(file);
+        let mut sender = Sender::new(file)?;
         self.execute(to, &mut sender, &Packet::WriteRequest {
             filename: file.to_owned(),
             mode: "octet".to_owned(),
@@ -18,7 +18,7 @@ impl Client {
     }
 
     pub fn download(&self, file: &str, from: &str) -> io::Result<()> {
-        let mut receiver = Receiver::new(file);
+        let mut receiver = Receiver::new(file)?;
         self.execute(from, &mut receiver, &Packet::ReadRequest {
             filename: file.to_owned(),
             mode: "octet".to_owned(),
@@ -35,7 +35,7 @@ impl Client {
         while !processor.done() {
             let (size, org) = socket.recv_from(&mut buf)?;
             if let Some(packet) = Packet::from(&buf[..size]) {
-                if let Ok(Some(reply)) = processor.process(&packet) {
+                if let Some(reply) = processor.process(&packet) {
                     socket.send_to(reply.to_bytes().as_slice(), org)?;
                 }
             }

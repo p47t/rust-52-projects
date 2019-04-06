@@ -10,12 +10,12 @@ impl Server {
     }
 
     pub fn send(&self, file: &str, at: &str) -> std::io::Result<()> {
-        let mut sender = Sender::new(file);
+        let mut sender = Sender::new(file)?;
         self.serve(at, &mut sender)
     }
 
     pub fn recv(&self, file: &str, at: &str) -> std::io::Result<()> {
-        let mut receiver = Receiver::new(file);
+        let mut receiver = Receiver::new(file)?;
         self.serve(at, &mut receiver)
     }
 
@@ -25,7 +25,7 @@ impl Server {
         while !processor.done() {
             let (size, org) = socket.recv_from(&mut buf)?;
             if let Some(packet) = Packet::from(&buf[..size]) {
-                if let Ok(Some(reply)) = processor.process(&packet) {
+                if let Some(reply) = processor.process(&packet) {
                     socket.send_to(reply.to_bytes().as_slice(), org)?;
                 }
             }
