@@ -1,20 +1,34 @@
 use bytes::{Buf, BufMut, BytesMut};
-use std::io::{Cursor, Read, BufRead};
+use std::io::{Cursor, Read};
 
-const OP_RRQ: u16 = 1;
-const OP_WRQ: u16 = 2;
-const OP_DATA: u16 = 3;
-const OP_ACK: u16 = 4;
-const OP_ERROR: u16 = 5;
+enum OpCode {
+    Rrq = 1, Wrq, Data, Ack, Error, Invalid
+}
 
-const ERR_NOT_DEFINED: u16 = 0;
-const ERR_FILE_NOT_FOUND: u16 = 1;
-const ERR_ACCESS_VIOLATION: u16 = 2;
-const ERR_DISK_FULL: u16 = 3;
-const ERR_ILLEGAL_OP: u16 = 4;
-const ERR_UNKNOWN_TID: u16 = 5;
-const ERR_FILE_ALREADY_EXISTS: u16 = 6;
-const ERR_NO_SUCH_USER: u16 = 7;
+impl OpCode {
+    fn from(val: u16) -> OpCode {
+        match val {
+            1 => OpCode::Rrq,
+            2 => OpCode::Wrq,
+            3 => OpCode::Data,
+            4 => OpCode::Ack,
+            5 => OpCode::Error,
+            _ => OpCode::Invalid,
+        }
+    }
+}
+
+#[allow(dead_code)]
+enum ErrorCode {
+    NotDefined = 0,
+    FileNotFound = 1,
+    AccessViolation = 2,
+    DiskFull = 3,
+    IllegalOp = 4,
+    UnknownTid = 5,
+    FileAlreadyExists = 6,
+    NoSuchUser = 7,
+}
 
 #[derive(PartialEq, Debug)]
 pub enum Packet {
@@ -42,27 +56,27 @@ pub enum Packet {
 impl Packet {
     pub fn from(payload: &[u8]) -> Option<Packet> {
         let mut cursor = Cursor::new(payload);
-        match cursor.get_u16_be() {
-            OP_RRQ => Some(Packet::ReadRequest {
+        match OpCode::from(cursor.get_u16_be()) {
+            OpCode::Rrq => Some(Packet::ReadRequest {
                 filename: read_cstr(&mut cursor),
                 mode: read_cstr(&mut cursor),
             }),
-            OP_WRQ => Some(Packet::WriteRequest {
+            OpCode::Wrq => Some(Packet::WriteRequest {
                 filename: read_cstr(&mut cursor),
                 mode: read_cstr(&mut cursor),
             }),
-            OP_DATA => Some(Packet::Data {
+            OpCode::Data => Some(Packet::Data {
                 block_num: cursor.get_u16_be(),
                 data: {
                     let mut vec = Vec::<u8>::new();
-                    cursor.read_to_end(&mut vec);
+                    let _ = cursor.read_to_end(&mut vec);
                     vec
                 },
             }),
-            OP_ACK => Some(Packet::Ack {
+            OpCode::Ack => Some(Packet::Ack {
                 block_num: cursor.get_u16_be(),
             }),
-            OP_ERROR => Some(Packet::Error {
+            OpCode::Error => Some(Packet::Error {
                 error_code: cursor.get_u16_be(),
                 error_msg: read_cstr(&mut cursor),
             }),
@@ -74,7 +88,7 @@ impl Packet {
         let mut buf = BytesMut::with_capacity(1024);
         match self {
             Packet::ReadRequest { filename, mode } => {
-                buf.put_u16_be(OP_RRQ);
+                buf.put_u16_be(OpCode::Rrq as u16);
 
                 filename.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
@@ -83,7 +97,7 @@ impl Packet {
                 buf.put(0u8);
             }
             Packet::WriteRequest { filename, mode } => {
-                buf.put_u16_be(OP_WRQ);
+                buf.put_u16_be(OpCode::Wrq as u16);
 
                 filename.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
@@ -92,16 +106,16 @@ impl Packet {
                 buf.put(0u8);
             }
             Packet::Data { block_num, data } => {
-                buf.put_u16_be(OP_DATA);
+                buf.put_u16_be(OpCode::Data as u16);
                 buf.put_u16_be(*block_num);
                 buf.put_slice(data);
             }
             Packet::Ack { block_num } => {
-                buf.put_u16_be(OP_ACK);
+                buf.put_u16_be(OpCode::Ack as u16);
                 buf.put_u16_be(*block_num);
             }
             Packet::Error { error_code, error_msg } => {
-                buf.put_u16_be(OP_ERROR);
+                buf.put_u16_be(OpCode::Error as u16);
                 buf.put_u16_be(*error_code);
                 error_msg.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
@@ -145,12 +159,8 @@ impl Receiver {
 impl Processor for Receiver {
     fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
         match packet {
-            Packet::Ack { block_num } => {
-                if *block_num == self.current_block {
-                    Ok(None)
-                } else {
-                    Err(())
-                }
+            Packet::WriteRequest { .. } => {
+                Ok(Some(Packet::Ack { block_num: 0 }))
             }
             Packet::Data { block_num, data } => {
                 if *block_num != self.current_block + 1 {
@@ -166,7 +176,6 @@ impl Processor for Receiver {
                 Ok(Some(Packet::Ack { block_num: *block_num }))
             }
             _ => {
-                self.done = true;
                 Err(())
             }
         }
@@ -192,6 +201,9 @@ impl Sender {
 impl Processor for Sender {
     fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
         match packet {
+            Packet::ReadRequest { .. } => {
+                Ok(Some(Packet::Ack { block_num: 0 }))
+            }
             Packet::Ack { block_num } => {
                 if *block_num == self.current_block {
                     // TODO: read data from file
@@ -207,7 +219,6 @@ impl Processor for Sender {
                 }
             }
             _ => {
-                self.done = true;
                 Err(())
             }
         }
@@ -332,12 +343,8 @@ mod tests {
         let mut receiver = Receiver::new("rfc1350.txt");
         assert!(!receiver.done());
 
-        let reply = receiver.process(&Packet::Ack { block_num: 1 });
-        assert_eq!(reply, Err(()));
-        assert!(!receiver.done());
-
         let reply = receiver.process(&Packet::Ack { block_num: 0 });
-        assert_eq!(reply, Ok(None));
+        assert_eq!(reply, Err(()));
         assert!(!receiver.done());
 
         let reply = receiver.process(&Packet::Data { block_num: 2, data: vec![0u8] });
