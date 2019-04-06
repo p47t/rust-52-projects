@@ -1,5 +1,6 @@
 use std::net::UdpSocket;
-use crate::tftp::{Sender, Receiver, Packet};
+use std::io;
+use crate::tftp::{Sender, Receiver, Packet, Processor};
 
 pub struct Client {}
 
@@ -8,30 +9,36 @@ impl Client {
         Client {}
     }
 
-    pub fn send(&self, file: &str, to: &str) -> std::io::Result<()> {
-        let _sender = Sender::new(file);
-        self.connect(to)?;
-        Ok(())
+    pub fn send(&self, file: &str, to: &str) -> io::Result<()> {
+        let mut sender = Sender::new(file);
+        self.start(to, &mut sender, &Packet::WriteRequest {
+            filename: file.to_owned(),
+            mode: "octet".to_owned(),
+        })
     }
 
-    pub fn recv(&self, file: &str, from: &str) -> std::io::Result<()> {
-        let _receiver = Receiver::new(file);
-        self.connect(from)?;
-        Ok(())
+    pub fn recv(&self, file: &str, from: &str) -> io::Result<()> {
+        let mut receiver = Receiver::new(file);
+        self.start(from, &mut receiver, &Packet::ReadRequest {
+            filename: file.to_owned(),
+            mode: "octet".to_owned(),
+        })
     }
 
-    pub fn connect(&self, addr: &str) -> std::io::Result<()> {
+    fn start<T: Processor>(&self, addr: &str, processor: &mut T, req: &Packet) -> io::Result<()> {
+        // send initial request and get origin address of response
         let socket = UdpSocket::bind("0.0.0.0:0")?;
-        socket.connect(addr)?;
+        socket.send_to(req.to_bytes().as_slice(), addr)?;
 
-        let mut buf = [0u8; 10];
-        loop {
-            let packet = Packet::generate(&Packet::ReadRequest {
-                filename: "".to_owned(),
-                mode: "".to_owned(),
-            });
-            socket.send(packet.as_slice())?;
-            socket.recv(&mut buf)?;
+        let mut buf = [0u8; 1024];
+        while !processor.done() {
+            let (size, org) = socket.recv_from(&mut buf)?;
+            if let Some(packet) = Packet::from(&buf[..size]) {
+                if let Ok(Some(reply)) = processor.process(&packet) {
+                    socket.send_to(reply.to_bytes().as_slice(), org);
+                }
+            }
         }
+        Ok(())
     }
 }

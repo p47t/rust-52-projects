@@ -123,6 +123,10 @@ fn read_cstr(cursor: &mut Cursor<&[u8]>) -> String {
     cstr
 }
 
+pub trait Processor {
+    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()>;
+    fn done(&self) -> bool;
+}
 
 pub struct Receiver {
     current_block: u16,
@@ -136,8 +140,10 @@ impl Receiver {
             done: false,
         }
     }
+}
 
-    pub fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
+impl Processor for Receiver {
+    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
         match packet {
             Packet::Ack { block_num } => {
                 if *block_num == self.current_block {
@@ -166,7 +172,7 @@ impl Receiver {
         }
     }
 
-    pub fn done(&self) -> bool { self.done }
+    fn done(&self) -> bool { self.done }
 }
 
 pub struct Sender {
@@ -181,8 +187,10 @@ impl Sender {
             done: false,
         }
     }
+}
 
-    pub fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
+impl Processor for Sender {
+    fn process(&mut self, packet: &Packet) -> Result<Option<Packet>, ()> {
         match packet {
             Packet::Ack { block_num } => {
                 if *block_num == self.current_block {
@@ -205,12 +213,12 @@ impl Sender {
         }
     }
 
-    pub fn done(&self) -> bool { self.done }
+    fn done(&self) -> bool { self.done }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tftp::{Packet, Receiver, Sender};
+    use super::*;
 
     #[test]
     fn test_packet_parse() {
