@@ -1,0 +1,1 @@
+Build Rust programming skill by creating 52 projects in one year.
