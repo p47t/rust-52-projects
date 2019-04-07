@@ -41,6 +41,7 @@ mod tests {
     use crate::DEFAULT_SERVER_ADDR;
 
     #[test]
+    #[ignore]
     fn test_download() {
         let server = std::thread::spawn(|| {
             let server = Server::new();
@@ -52,6 +53,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_upload() {
         let server = std::thread::spawn(|| {
             let server = Server::new();
