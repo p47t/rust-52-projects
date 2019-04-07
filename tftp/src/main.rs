@@ -44,10 +44,10 @@ mod tests {
     fn test_download() {
         let server = std::thread::spawn(|| {
             let server = Server::new();
-            let _ = server.send("rfc1350.txt", DEFAULT_SERVER_ADDR);
+            let _ = server.send("README.md", DEFAULT_SERVER_ADDR);
         });
         let client = Client::new();
-        let _ = client.download("rfc1350-downloaded.txt", DEFAULT_SERVER_ADDR);
+        let _ = client.download("README-downloaded.md", DEFAULT_SERVER_ADDR);
         let _ = server.join();
     }
 
@@ -55,10 +55,10 @@ mod tests {
     fn test_upload() {
         let server = std::thread::spawn(|| {
             let server = Server::new();
-            let _ = server.recv("rfc1350-uploaded.txt", DEFAULT_SERVER_ADDR);
+            let _ = server.recv("README-uploaded.md", DEFAULT_SERVER_ADDR);
         });
         let client = Client::new();
-        let _ = client.upload("rfc1350.txt", DEFAULT_SERVER_ADDR);
+        let _ = client.upload("README.md", DEFAULT_SERVER_ADDR);
         let _ = server.join();
     }
 }
