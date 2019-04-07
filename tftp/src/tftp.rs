@@ -2,6 +2,8 @@ use bytes::{Buf, BufMut, BytesMut};
 use std::io::{Cursor, Read, Write};
 use std::fs::File;
 
+const BLOCK_SIZE: usize = 512;
+
 enum OpCode {
     Rrq = 1,
     Wrq,
@@ -91,43 +93,44 @@ impl Packet {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = BytesMut::with_capacity(1024);
+        let mut buf;
         match self {
             Packet::ReadRequest { filename, mode } => {
+                buf = BytesMut::with_capacity(128);
                 buf.put_u16_be(OpCode::Rrq as u16);
-
                 filename.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
-
                 mode.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
             }
             Packet::WriteRequest { filename, mode } => {
+                buf = BytesMut::with_capacity(128);
                 buf.put_u16_be(OpCode::Wrq as u16);
-
                 filename.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
-
                 mode.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
             }
             Packet::Data { block_num, data } => {
+                buf = BytesMut::with_capacity(4);
                 buf.put_u16_be(OpCode::Data as u16);
                 buf.put_u16_be(*block_num);
-                buf.put_slice(data);
+                buf.extend_from_slice(data);
             }
             Packet::Ack { block_num } => {
+                buf = BytesMut::with_capacity(4);
                 buf.put_u16_be(OpCode::Ack as u16);
                 buf.put_u16_be(*block_num);
             }
             Packet::Error { error_code, error_msg } => {
+                buf = BytesMut::with_capacity(128);
                 buf.put_u16_be(OpCode::Error as u16);
                 buf.put_u16_be(*error_code);
                 error_msg.bytes().for_each(|b| buf.put(b));
                 buf.put(0u8);
             }
         }
-        buf.to_vec()
+        buf.freeze().to_vec()
     }
 }
 
@@ -176,7 +179,7 @@ impl LockStep for Receiver {
                 }
                 self.current_block = *block_num;
                 let _ = self.file.write(data);
-                if data.len() < 512 {
+                if data.len() < BLOCK_SIZE {
                     self.done = true;
                 }
 
@@ -205,15 +208,16 @@ impl Sender {
     }
 
     pub fn next_block(&mut self) -> std::io::Result<Packet> {
-        let mut data = vec![0; 512];
+        let mut data = vec![0; BLOCK_SIZE];
         let size = self.file.read(data.as_mut_slice())?;
         self.current_block += 1;
-        if size < 512 {
+        if size < BLOCK_SIZE {
+            data.truncate(size);
             self.done = true;
         }
         Ok(Packet::Data {
             block_num: self.current_block,
-            data: data[..size].to_vec(),
+            data,
         })
     }
 }
@@ -249,7 +253,7 @@ mod tests {
     const INPUT: &str = "rfc1350.txt";
     const OUTPUT: &str = "rfc1350-received.txt";
     const MODE: &str = "octet";
-    const CONTENT: &str = "TFTP";
+    const CONTENT: &[u8] = b"TFTP";
 
     #[test]
     fn test_packet_parse() {
@@ -382,7 +386,7 @@ mod tests {
         assert!(!sender.done());
 
         let reply = sender.process(&Packet::Ack { block_num: 0 });
-        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.to_vec() }));
         assert!(sender.done());
     }
 
@@ -397,7 +401,7 @@ mod tests {
         });
         assert_eq!(reply, Some(Packet::Ack { block_num: 0 }));
         let reply = sender.process(&reply.unwrap());
-        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.to_vec() }));
         assert!(sender.done());
         let reply = receiver.process(&reply.unwrap());
         assert_eq!(reply, Some(Packet::Ack { block_num: 1 }));
@@ -413,7 +417,7 @@ mod tests {
             filename: INPUT.to_string(),
             mode: MODE.to_string(),
         });
-        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.bytes().collect() }));
+        assert_eq!(reply, Some(Packet::Data { block_num: 1, data: CONTENT.to_vec() }));
         assert!(sender.done());
         let reply = receiver.process(&reply.unwrap());
         assert_eq!(reply, Some(Packet::Ack { block_num: 1 }));
