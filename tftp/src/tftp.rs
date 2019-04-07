@@ -143,7 +143,7 @@ fn read_cstr(cursor: &mut Cursor<&[u8]>) -> String {
     cstr
 }
 
-pub trait Processor {
+pub trait LockStep {
     fn process(&mut self, packet: &Packet) -> Option<Packet>;
     fn done(&self) -> bool;
 }
@@ -164,7 +164,7 @@ impl Receiver {
     }
 }
 
-impl Processor for Receiver {
+impl LockStep for Receiver {
     fn process(&mut self, packet: &Packet) -> Option<Packet> {
         match packet {
             Packet::WriteRequest { .. } => {
@@ -218,7 +218,7 @@ impl Sender {
     }
 }
 
-impl Processor for Sender {
+impl LockStep for Sender {
     fn process(&mut self, packet: &Packet) -> Option<Packet> {
         match packet {
             Packet::ReadRequest { .. } => {

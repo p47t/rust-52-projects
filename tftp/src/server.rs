@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use crate::tftp::{Sender, Receiver, Packet, Processor};
+use crate::tftp::{Sender, Receiver, Packet, LockStep};
 use std::io;
 
 pub struct Server {}
@@ -19,13 +19,13 @@ impl Server {
         self.serve(at, &mut receiver)
     }
 
-    fn serve<T: Processor>(&self, addr: &str, processor: &mut T) -> io::Result<()> {
+    fn serve<T: LockStep>(&self, addr: &str, lock_stepper: &mut T) -> io::Result<()> {
         let socket = UdpSocket::bind(addr)?;
         let mut buf = [0u8; 1024];
-        while !processor.done() {
+        while !lock_stepper.done() {
             let (size, org) = socket.recv_from(&mut buf)?;
             if let Some(packet) = Packet::from(&buf[..size]) {
-                if let Some(reply) = processor.process(&packet) {
+                if let Some(reply) = lock_stepper.process(&packet) {
                     socket.send_to(reply.to_bytes().as_slice(), org)?;
                 }
             }

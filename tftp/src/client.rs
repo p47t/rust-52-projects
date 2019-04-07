@@ -1,6 +1,6 @@
 use std::net::UdpSocket;
 use std::io;
-use crate::tftp::{Packet, Processor, Sender, Receiver};
+use crate::tftp::{Packet, LockStep, Sender, Receiver};
 
 pub struct Client {}
 
@@ -25,17 +25,16 @@ impl Client {
         })
     }
 
-    // Execute request with specified packet processor
-    fn execute<T: Processor>(&self, addr: &str, processor: &mut T, req: &Packet) -> io::Result<()> {
+    fn execute<T: LockStep>(&self, addr: &str, lock_stepper: &mut T, req: &Packet) -> io::Result<()> {
         // send initial request and get origin address of response
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         socket.send_to(req.to_bytes().as_slice(), addr)?;
 
         let mut buf = [0u8; 1024];
-        while !processor.done() {
+        while !lock_stepper.done() {
             let (size, org) = socket.recv_from(&mut buf)?;
             if let Some(packet) = Packet::from(&buf[..size]) {
-                if let Some(reply) = processor.process(&packet) {
+                if let Some(reply) = lock_stepper.process(&packet) {
                     socket.send_to(reply.to_bytes().as_slice(), org)?;
                 }
             }
