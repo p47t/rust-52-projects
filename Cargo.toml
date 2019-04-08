@@ -3,4 +3,5 @@
 members = [
   "rolldice",
   "tftp",
+  "shell",
 ]

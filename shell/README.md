@@ -1,0 +1,1 @@
+A shell implementation in Rust based on [Shell From Scratch](https://www.destroyallsoftware.com/screencasts/catalog/shell-from-scratch) of Destroy All Software.
