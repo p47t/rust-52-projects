@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate nom;
 
-use rustyline::{Editor};
+use rustyline::Editor;
 use std::process::{Stdio, Child};
 use std::str::from_utf8;
 use std::io::Error;
 
-trait Cmdline {
+trait Executable {
     fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error>;
 }
 
@@ -17,26 +17,26 @@ struct Command {
 }
 
 impl Command {
-    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Child, Error> {
-        Ok(std::process::Command::new(&self.program).stdin(stdin).stdout(stdout).args(&self.args).spawn()?)
+    fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Child, Error> {
+        Ok(std::process::Command::new(&self.program).stdin(cin).stdout(cout).args(&self.args).spawn()?)
     }
 }
 
-impl Cmdline for Command {
-    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error> {
-        Ok(vec![self.execute(stdin, stdout)?])
+impl Executable for Command {
+    fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error> {
+        Ok(vec![self.execute(cin, cout)?])
     }
 }
 
 struct Pipeline {
     left: Command,
-    right: Box<dyn Cmdline>,
+    right: Box<dyn Executable>,
 }
 
-impl Cmdline for Pipeline {
-    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error> {
-        let mut left = self.left.execute(stdin, Stdio::piped())?;
-        let right = self.right.execute(Stdio::from(left.stdout.take().unwrap()), stdout)?;
+impl Executable for Pipeline {
+    fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error> {
+        let mut left = self.left.execute(cin, Stdio::piped())?;
+        let right = self.right.execute(Stdio::from(left.stdout.take().unwrap()), cout)?;
         let mut children = vec![left];
         children.extend(right);
         Ok(children)
@@ -61,17 +61,17 @@ named!(command<Command>,
     )
 );
 
-named!(cmdline<Box<dyn Cmdline>>, alt!(
+named!(cmdline<Box<dyn Executable>>, alt!(
     pipeline |
-    command => {|c| Box::new(c) as Box<dyn Cmdline>}
+    command => {|c| Box::new(c) as Box<dyn Executable>}
 ));
 
-named!(pipeline<Box<dyn Cmdline>>,
+named!(pipeline<Box<dyn Executable>>,
     do_parse!(
         left: command >>
         pipe >>
         right: cmdline >>
-        (Box::new(Pipeline{left, right}) as Box<dyn Cmdline>)
+        (Box::new(Pipeline{left, right}) as Box<dyn Executable>)
     )
 );
 
