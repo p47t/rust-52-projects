@@ -1,12 +1,10 @@
-#![allow(unused_variables)]
-
 #[macro_use]
 extern crate nom;
 
-use rustyline::Editor;
-use failure::Error;
-use std::process::ExitStatus;
+use rustyline::{Editor};
+use std::process::{Stdio, Child};
 use std::str::from_utf8;
+use std::io::Error;
 
 named!(pipe, is_a!("|"));
 named!(unquoted_arg, is_not!(" \t\r\n'|"));
@@ -41,7 +39,7 @@ named!(pipeline<Box<dyn Cmdline>>,
 );
 
 trait Cmdline {
-    fn execute(&self) -> Result<ExitStatus, Error>;
+    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error>;
 }
 
 #[derive(Debug)]
@@ -50,22 +48,46 @@ struct Command {
     args: Vec<String>,
 }
 
+impl Command {
+    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Child, Error> {
+        Ok(std::process::Command::new(&self.program).stdin(stdin).stdout(stdout).args(&self.args).spawn()?)
+    }
+}
+
+impl Cmdline for Command {
+    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error> {
+        Ok(vec![self.execute(stdin, stdout)?])
+    }
+}
+
 struct Pipeline {
     left: Command,
     right: Box<dyn Cmdline>,
 }
 
 impl Cmdline for Pipeline {
-    fn execute(&self) -> Result<ExitStatus, Error> {
-        self.left.execute();
-        self.right.execute()
+    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error> {
+        let mut left = self.left.execute(stdin, Stdio::piped())?;
+        let right = self.right.execute(Stdio::from(left.stdout.take().unwrap()), stdout)?;
+        let mut children = vec![left];
+        children.extend(right);
+        Ok(children)
     }
 }
 
-impl Cmdline for Command {
-    fn execute(&self) -> Result<ExitStatus, Error> {
-        let mut child = std::process::Command::new(&self.program).args(&self.args).spawn()?;
-        Ok(child.wait()?)
+fn parse_and_execute(line: &[u8]) {
+    match cmdline(line) {
+        Ok((_, cl)) => {
+            match cl.execute(Stdio::inherit(), Stdio::inherit()) {
+                Err(why) => eprintln!("Failed to execute: {}", why),
+                Ok(mut children) => {
+                    children.iter_mut().for_each(|child| {
+                        let _ = child.wait();
+                    });
+                },
+            }
+        }
+        Err(why) => eprintln!("Failed to parse: {}", why)
     }
 }
 
@@ -73,12 +95,7 @@ fn main() {
     let mut rl = Editor::<()>::new();
     loop {
         if let Ok(line) = rl.readline("> ") {
-            match cmdline(line.as_bytes()) {
-                Ok((rest, cl)) => {
-                    cl.execute();
-                }
-                _ => {}
-            }
+            parse_and_execute(line.as_bytes());
         }
     }
 }
