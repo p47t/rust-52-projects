@@ -6,38 +6,6 @@ use std::process::{Stdio, Child};
 use std::str::from_utf8;
 use std::io::Error;
 
-named!(pipe, is_a!("|"));
-named!(unquoted_arg, is_not!(" \t\r\n'|"));
-named!(single_quoted_arg, delimited!(tag!("'"), take_until!("'"), tag!("'")));
-named!(arg, delimited!(nom::space0, alt!(unquoted_arg | single_quoted_arg), nom::space0));
-
-named!(command<Command>,
-    do_parse!(
-        args: many1!(arg) >>
-        ({
-            let args: Vec<String> = args.iter().map(|s| from_utf8(s).unwrap().to_string()).collect();
-            Command {
-                program: args.first().unwrap().to_string(),
-                args: args[1..].to_vec(),
-            }
-        })
-    )
-);
-
-named!(cmdline<Box<dyn Cmdline>>, alt!(
-    pipeline |
-    command => {|c| Box::new(c) as Box<dyn Cmdline>}
-));
-
-named!(pipeline<Box<dyn Cmdline>>,
-    do_parse!(
-        left: command >>
-        pipe >>
-        right: cmdline >>
-        (Box::new(Pipeline{left, right}) as Box<dyn Cmdline>)
-    )
-);
-
 trait Cmdline {
     fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error>;
 }
@@ -74,6 +42,38 @@ impl Cmdline for Pipeline {
         Ok(children)
     }
 }
+
+named!(pipe, is_a!("|"));
+named!(unquoted_arg, is_not!(" \t\r\n'|"));
+named!(single_quoted_arg, delimited!(tag!("'"), take_until!("'"), tag!("'")));
+named!(arg, delimited!(nom::space0, alt!(unquoted_arg | single_quoted_arg), nom::space0));
+
+named!(command<Command>,
+    do_parse!(
+        args: many1!(arg) >>
+        ({
+            let args: Vec<String> = args.iter().map(|s| from_utf8(s).unwrap().to_string()).collect();
+            Command {
+                program: args.first().unwrap().to_string(),
+                args: args[1..].to_vec(),
+            }
+        })
+    )
+);
+
+named!(cmdline<Box<dyn Cmdline>>, alt!(
+    pipeline |
+    command => {|c| Box::new(c) as Box<dyn Cmdline>}
+));
+
+named!(pipeline<Box<dyn Cmdline>>,
+    do_parse!(
+        left: command >>
+        pipe >>
+        right: cmdline >>
+        (Box::new(Pipeline{left, right}) as Box<dyn Cmdline>)
+    )
+);
 
 fn parse_and_execute(line: &[u8]) {
     match cmdline(line) {
