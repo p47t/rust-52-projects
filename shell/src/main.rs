@@ -1,8 +1,30 @@
 #![allow(unused_variables)]
 
+#[macro_use]
+extern crate nom;
+
 use rustyline::Editor;
 use failure::Error;
 use std::process::ExitStatus;
+use std::str::from_utf8;
+
+named!(pipe, is_a!("|"));
+named!(unquoted_arg, is_not!(" \t\r\n'|"));
+named!(single_quoted_arg, delimited!(tag!("'"), take_until!("'"), tag!("'")));
+named!(arg, delimited!(nom::space0, alt!(unquoted_arg | single_quoted_arg), nom::space0));
+
+named!(command<&[u8], Command>,
+    do_parse!(
+        args: many1!(arg) >>
+        ({
+            let args: Vec<String> = args.iter().map(|s| from_utf8(s).unwrap().to_string()).collect();
+            Command {
+                program: args.first().unwrap().to_string(),
+                args: args[1..].to_vec(),
+            }
+        })
+    )
+);
 
 #[derive(Debug)]
 struct Command {
@@ -25,12 +47,8 @@ impl Parser {
     }
 
     fn parse(&self, line: String) -> Option<Command> {
-        let args: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
-        if let Some(program) = args.first() {
-            Some(Command {
-                program: program.to_string(),
-                args: args[1..].to_vec(),
-            })
+        if let Ok((rest, command)) = command(line.as_bytes()) {
+            Some(command)
         } else {
             None
         }
