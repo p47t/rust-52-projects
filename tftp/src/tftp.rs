@@ -13,7 +13,7 @@ enum OpCode {
     Invalid,
 }
 
-impl OpCode {
+impl From<u16> for OpCode {
     fn from(val: u16) -> OpCode {
         match val {
             1 => OpCode::Rrq,
