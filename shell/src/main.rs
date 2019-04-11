@@ -7,7 +7,7 @@ use std::str::from_utf8;
 use std::io::Error;
 
 trait Executable {
-    fn execute(&self, stdin: Stdio, stdout: Stdio) -> Result<Vec<Child>, Error>;
+    fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error>;
 }
 
 #[derive(Debug)]
@@ -18,7 +18,8 @@ struct Command {
 
 impl Command {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Child, Error> {
-        Ok(std::process::Command::new(&self.program).stdin(cin).stdout(cout).args(&self.args).spawn()?)
+        Ok(std::process::Command::new(&self.program)
+            .stdin(cin).stdout(cout).args(&self.args).spawn()?)
     }
 }
 
@@ -52,10 +53,10 @@ named!(command<Command>,
     do_parse!(
         args: many1!(arg) >>
         ({
-            let args: Vec<String> = args.iter().map(|s| from_utf8(s).unwrap().to_string()).collect();
+            let args: Vec<&str> = args.iter().map(|bytes| from_utf8(bytes).unwrap()).collect();
             Command {
                 program: args.first().unwrap().to_string(),
-                args: args[1..].to_vec(),
+                args: args[1..].iter().map(|str| str.to_string()).collect(),
             }
         })
     )
@@ -75,16 +76,16 @@ named!(pipeline<Box<dyn Executable>>,
     )
 );
 
-fn parse_and_execute(line: &[u8]) {
-    match cmdline(line) {
-        Ok((_, cl)) => {
-            match cl.execute(Stdio::inherit(), Stdio::inherit()) {
+fn parse_and_execute(line: &str) {
+    match cmdline(line.as_bytes()) {
+        Ok((_, exe)) => {
+            match exe.execute(Stdio::inherit(), Stdio::inherit()) {
                 Err(why) => eprintln!("Failed to execute: {}", why),
-                Ok(mut children) => {
-                    children.iter_mut().for_each(|child| {
+                Ok(children) => {
+                    for mut child in children {
                         let _ = child.wait();
-                    });
-                },
+                    }
+                }
             }
         }
         Err(why) => eprintln!("Failed to parse: {}", why)
@@ -95,7 +96,7 @@ fn main() {
     let mut rl = Editor::<()>::new();
     loop {
         if let Ok(line) = rl.readline("> ") {
-            parse_and_execute(line.as_bytes());
+            parse_and_execute(&line);
         }
     }
 }
