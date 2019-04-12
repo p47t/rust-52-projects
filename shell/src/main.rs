@@ -77,6 +77,9 @@ named!(pipeline<Box<dyn Executable>>,
 );
 
 fn parse_and_execute(line: &str) {
+    if line.trim().is_empty() {
+        return
+    }
     match cmdline(line.as_bytes()) {
         Ok((_, exe)) => {
             match exe.execute(Stdio::inherit(), Stdio::inherit()) {
