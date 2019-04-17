@@ -78,7 +78,7 @@ named!(pipeline<Box<dyn Executable>>,
 
 fn parse_and_execute(line: &str) {
     if line.trim().is_empty() {
-        return
+        return;
     }
     match cmdline(line.as_bytes()) {
         Ok((_, exe)) => {
