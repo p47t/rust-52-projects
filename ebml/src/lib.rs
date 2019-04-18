@@ -51,5 +51,29 @@ mod tests {
         let bytes = vec![0x40u8, 0x00];
         let i = vint(&bytes).unwrap().1;
         assert_eq!(i, 0u64);
+
+        let bytes = vec![0x40u8, 0x00];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0u64);
+
+        let bytes = vec![0x4fu8, 0x88];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0xf88u64);
+
+        let bytes = vec![0x21u8, 0x32, 0x23];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0x13223u64);
+
+        let bytes = vec![0x11u8, 0x23, 0x45, 0x67];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0x1234567);
+
+        let bytes = vec![0x09u8, 0x23, 0x45, 0x67, 0x89];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0x123456789);
+
+        let bytes = vec![0x05u8, 0x23, 0x45, 0x67, 0x89, 0xab];
+        let i = vint(&bytes).unwrap().1;
+        assert_eq!(i, 0x123456789ab);
     }
 }
