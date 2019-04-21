@@ -70,10 +70,10 @@ pub fn string(input: &[u8]) -> IResult<&[u8], String> {
     Ok((r.0, String::from_utf8(r.1.to_vec()).unwrap()))
 }
 
-pub fn skip_element(input: &[u8]) -> IResult<&[u8], ()> {
+pub fn skip_element(input: &[u8]) -> IResult<&[u8], usize> {
     let (input, size) = vsize(input)?;
     let r = nom::take!(input, size)?;
-    Ok((r.0, ()))
+    Ok((r.0, size))
 }
 
 pub struct EBMLHeader {
@@ -145,9 +145,9 @@ pub fn ebml_header(input: &[u8]) -> IResult<&[u8], EBMLHeader> {
                 header.doc_type_read_version = val;
             }
             _ => {
-                let (i, _) = skip_element(input)?;
+                let (i, size) = skip_element(input)?;
                 input = i;
-                eprintln!("Ignore element of ID {:x}", id);
+                eprintln!("Ignore element {:x} of {:x} bytes", id, size);
             }
         }
     }
@@ -156,20 +156,127 @@ pub fn ebml_header(input: &[u8]) -> IResult<&[u8], EBMLHeader> {
 }
 
 pub struct EBMLSegment {
+    pub size: u64,
+}
+
+impl EBMLSegment {
+    pub fn next_element<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], SegmentElement> {
+        ebml_segment_element(input)
+    }
 }
 
 pub fn ebml_segment(input: &[u8]) -> IResult<&[u8], EBMLSegment> {
-    let segment = EBMLSegment {};
+    let mut segment = EBMLSegment {
+        size: 0
+    };
+
+    const SEGMENT_ID: [u8; 4] = [0x18u8, 0x53, 0x80, 0x67];
+    let (input, _) = nom::take_until_and_consume!(input, &SEGMENT_ID[..])?;
+    let (input, size) = vint(input)?;
+    segment.size = size;
+
     Ok((input, segment))
+}
+
+pub enum SegmentElement {
+    SeekHead,
+    Info,
+    Tracks,
+    Chapters,
+    Cluster,
+    Cues,
+    Attachments,
+    Tags,
+    Void(u64),
+    Unknown(u64),
+}
+
+pub struct SeekHead {
+    pub positions: Vec<Seek>,
+}
+
+pub struct Seek {
+    pub id: Vec<u8>,
+    pub position: u64,
+}
+
+pub fn seek_head(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::SeekHead))
+}
+
+pub fn info(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Info))
+}
+
+pub fn cluster(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Cluster))
+}
+
+pub fn chapters(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Chapters))
+}
+
+pub fn tags(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Tags))
+}
+
+pub fn attachments(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Attachments))
+}
+
+pub fn tracks(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Tracks))
+}
+
+pub fn cues(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, size) = vint(input)?;
+    let (input, _) = nom::take!(input, size)?;
+    Ok((input, SegmentElement::Cues))
+}
+
+pub fn ebml_segment_element(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+    let (input, id) = vid(input)?;
+    match id {
+        0x114D9B74 => seek_head(input),
+        0x1549A966 => info(input),
+        0x1F43B675 => cluster(input),
+        0x1043A770 => chapters(input),
+        0x1254C367 => tags(input),
+        0x1941A469 => attachments(input),
+        0x1654AE6B => tracks(input),
+        0x1C53BB6B => cues(input),
+        0xEC => {
+            let (input, size) = skip_element(input)?;
+            Ok((input, SegmentElement::Void(size as u64)))
+        }
+        _ => {
+            let (input, size) = skip_element(input)?;
+            Ok((input, SegmentElement::Unknown(size as u64)))
+        }
+    }
 }
 
 const EBML_ID: [u8; 4] = [0x1Au8, 0x45, 0xDF, 0xA3];
 
-pub fn ebml_file(input: &[u8]) -> IResult<&[u8], ()> {
+pub fn ebml_file(input: &[u8]) -> IResult<&[u8], (EBMLHeader, EBMLSegment)> {
     let (input, _) = nom::take_until_and_consume!(input, &EBML_ID[..])?;
-    let (input, _) = ebml_header(input)?;
-    let (input, _) = ebml_segment(input)?;
-    Ok((input, ()))
+    let (input, header) = ebml_header(input)?;
+    let (input, segment) = ebml_segment(input)?;
+    Ok((input, (header, segment)))
 }
 
 #[cfg(test)]
@@ -248,8 +355,59 @@ mod tests {
     fn test_ebml_header() {
         let res = ebml_file(&WEBM[..100]);
         assert!(res.is_ok());
+        let (_, (header, _)) = res.unwrap();
+        assert_eq!(header.doc_type, "webm");
 
         let res = ebml_file(&SINGLE_STREAM[..100]);
         assert!(res.is_ok());
+        let (_, (header, _)) = res.unwrap();
+        assert_eq!(header.doc_type, "matroska");
+    }
+
+    #[test]
+    fn test_webm_segment() {
+        let res = ebml_file(&WEBM[..]);
+        assert!(res.is_ok());
+        let (input, (_, segment)) = res.unwrap();
+
+        let res = segment.next_element(input);
+        assert!(res.is_ok());
+        let (input, element) = res.unwrap();
+        match element {
+            SegmentElement::SeekHead => (),
+            _ => panic!()
+        }
+
+        let res = segment.next_element(input);
+        assert!(res.is_ok());
+        let (input, element) = res.unwrap();
+        match element {
+            SegmentElement::Info => (),
+            _ => panic!()
+        }
+
+        let res = segment.next_element(input);
+        assert!(res.is_ok());
+        let (input, element) = res.unwrap();
+        match element {
+            SegmentElement::Tracks => (),
+            _ => panic!()
+        }
+
+        let res = segment.next_element(input);
+        assert!(res.is_ok());
+        let (input, element) = res.unwrap();
+        match element {
+            SegmentElement::Cues => (),
+            _ => panic!()
+        }
+
+        let res = segment.next_element(input);
+        assert!(res.is_ok());
+        let (input, element) = res.unwrap();
+        match element {
+            SegmentElement::Cluster => (),
+            _ => panic!()
+        }
     }
 }
