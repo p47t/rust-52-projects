@@ -170,8 +170,8 @@ pub fn ebml_segment(input: &[u8]) -> IResult<&[u8], EBMLSegment> {
         size: 0
     };
 
-    const SEGMENT_ID: [u8; 4] = [0x18u8, 0x53, 0x80, 0x67];
-    let (input, _) = nom::take_until_and_consume!(input, &SEGMENT_ID[..])?;
+    const SEGMENT_ID: &[u8] = &[0x18u8, 0x53, 0x80, 0x67];
+    let (input, _) = nom::take_until_and_consume!(input, SEGMENT_ID)?;
     let (input, size) = vint(input)?;
     segment.size = size;
 
@@ -270,10 +270,10 @@ pub fn ebml_segment_element(input: &[u8]) -> IResult<&[u8], SegmentElement> {
     }
 }
 
-const EBML_ID: [u8; 4] = [0x1Au8, 0x45, 0xDF, 0xA3];
+const EBML_ID: &[u8] = &[0x1Au8, 0x45, 0xDF, 0xA3];
 
 pub fn ebml_file(input: &[u8]) -> IResult<&[u8], (EBMLHeader, EBMLSegment)> {
-    let (input, _) = nom::take_until_and_consume!(input, &EBML_ID[..])?;
+    let (input, _) = nom::take_until_and_consume!(input, EBML_ID)?;
     let (input, header) = ebml_header(input)?;
     let (input, segment) = ebml_segment(input)?;
     Ok((input, (header, segment)))
@@ -404,7 +404,7 @@ mod tests {
 
         let res = segment.next_element(input);
         assert!(res.is_ok());
-        let (input, element) = res.unwrap();
+        let (_input, element) = res.unwrap();
         match element {
             SegmentElement::Cluster => (),
             _ => panic!()
