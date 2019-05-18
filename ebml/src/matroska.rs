@@ -4,7 +4,7 @@ use crate::ebml::{vid, vint, skip, binary, float, uint, string};
 pub enum Level1Element {
     SeekHead(SeekHead),
     Info(Info),
-    Tracks,
+    Tracks(Tracks),
     Chapters,
     Cluster,
     Cues,
@@ -40,6 +40,59 @@ pub struct Info {
     pub muxing_app: String,
     pub writing_app: String,
 }
+
+#[derive(Default)]
+pub struct Tracks {
+    pub tracks: Vec<Track>
+}
+
+#[derive(Default)]
+pub struct Track {
+    pub number: u64,
+    pub uid: Vec<u8>,
+    pub track_type: u64,
+    pub enabled: bool,
+    pub default: bool,
+    pub forced: bool,
+    pub lacing: bool,
+    pub min_cache: u64,
+    pub max_cache: u64,
+    pub default_duration: u64,
+    pub track_timecode_scale: f64,
+    pub name: String,
+    pub language: String,
+    pub codec_id: String,
+    pub codec_private: Vec<u8>,
+    pub codec_name: String,
+    pub attachment_link: u64,
+    pub video: Video,
+    pub audio: Audio,
+    pub content_encodings: ContentEncodings,
+}
+
+#[derive(Default)]
+pub struct Video {
+    pub pixel_width: u64,
+    pub pixel_height: u64,
+    pub pixel_crop_bottom: u64,
+    pub pixel_crop_top: u64,
+    pub pixel_crop_left: u64,
+    pub pixel_crop_right: u64,
+    pub display_width: u64,
+    pub display_height: u64,
+    pub display_uint: u64,
+}
+
+#[derive(Default)]
+pub struct Audio {
+    pub sampling_frequency: u64,
+    pub output_sampling_frequency: u64,
+    pub channels: u64,
+    pub bit_depth: u64,
+}
+
+#[derive(Default)]
+pub struct ContentEncodings {}
 
 pub fn seek_head(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
@@ -135,7 +188,7 @@ pub fn attachments(input: &[u8]) -> IResult<&[u8], Level1Element> {
 pub fn tracks(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, Level1Element::Tracks))
+    Ok((input, Level1Element::Tracks(Tracks::default())))
 }
 
 pub fn cues(input: &[u8]) -> IResult<&[u8], Level1Element> {
@@ -199,7 +252,7 @@ mod tests {
         assert!(res.is_ok());
         let (input, element) = res.unwrap();
         match element {
-            Level1Element::Tracks => (),
+            Level1Element::Tracks(_) => (),
             _ => panic!()
         }
 
