@@ -187,8 +187,40 @@ pub fn attachments(input: &[u8]) -> IResult<&[u8], Level1Element> {
 
 pub fn tracks(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
-    let (input, _) = nom::take!(input, size)?;
-    Ok((input, Level1Element::Tracks(Tracks::default())))
+    let (input, mut data) = nom::take!(input, size)?;
+
+    let mut tracks = Tracks::default();
+    while !data.is_empty() {
+        let id;
+        element!(data, id, vid);
+        match id {
+            0xAE => {
+                let t;
+                element!(data, t, track);
+                tracks.tracks.push(t);
+            }
+            _ => skip!(data, id),
+        }
+    }
+
+    Ok((input, Level1Element::Tracks(tracks)))
+}
+
+pub fn track(input: &[u8]) -> IResult<&[u8], Track> {
+    let (input, size) = vint(input)?;
+    let (input, mut data) = nom::take!(input, size)?;
+
+    let mut track = Track::default();
+    while !data.is_empty() {
+        let id;
+        element!(data, id, vid);
+        match id {
+            0xD7 => element!(data, track.number, uint),
+            _ => skip!(data, id),
+        }
+    }
+
+    Ok((input, track))
 }
 
 pub fn cues(input: &[u8]) -> IResult<&[u8], Level1Element> {
@@ -222,15 +254,17 @@ pub fn level1_element(input: &[u8]) -> IResult<&[u8], Level1Element> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ebml::ebml_file;
+    use crate::ebml;
 
     const WEBM: &'static [u8] = include_bytes!("../assets/big-buck-bunny_trailer.webm");
 
     #[test]
     fn test_webm_segment() {
-        let res = ebml_file(&WEBM[..]);
+        let res = ebml::parse(&WEBM[..]);
         assert!(res.is_ok());
-        let (input, (_, _)) = res.unwrap();
+        let (_, (_, segment)) = res.unwrap();
+
+        let input = segment.content;
 
         let res = level1_element(input);
         assert!(res.is_ok());

@@ -101,19 +101,21 @@ pub fn skip(input: &[u8]) -> IResult<&[u8], usize> {
     Ok((r.0, size))
 }
 
+// parse an element from the mutable input and move the result to specified output
 macro_rules! element {
     ($input: expr, $output: expr, $func: expr) => {{
-        let (_i, _val) = $func($input)?;
-        $input = _i;
-        $output = _val;
+        let _res = $func($input)?;
+        $input = _res.0;
+        $output = _res.1;
     }};
 }
 
+// skip the rest of an element after its ID field
 macro_rules! skip {
     ($input: expr, $id: expr) => {{
-        let (_i, _size) = skip($input)?;
-        $input = _i;
-        eprintln!("Ignore element {:x} of {:x} bytes", $id, _size);
+        let _res = skip($input)?;
+        $input = _res.0;
+        eprintln!("Ignore element {:x} of {:x} bytes", $id, _res.1);
     }};
 }
 
@@ -127,66 +129,67 @@ pub struct EBMLHeader {
     pub doc_type_read_version: u64,
 }
 
-pub fn ebml_header(input: &[u8]) -> IResult<&[u8], EBMLHeader> {
-    let (input, size) = vsize(input)?;
-    if input.len() < size {
-        return Err(nom::Err::Incomplete(::nom::Needed::Size(size)));
-    }
+impl EBMLHeader {
+    const ID: &'static [u8] = &[0x1Au8, 0x45, 0xDF, 0xA3];
 
-    let rest = &input[size..];
-    let mut input = &input[0..size];
-
-    let mut header = EBMLHeader {
-        version: 1,
-        read_version: 1,
-        max_id_length: 4,
-        max_size_length: 8,
-        doc_type: "matroska".into(),
-        doc_type_version: 1,
-        doc_type_read_version: 1,
-    };
-
-    while !input.is_empty() {
-        let id;
-        element!(input, id, vid);
-        match id {
-            0x4286 => element!(input, header.version, uint),
-            0x42F7 => element!(input, header.read_version, uint),
-            0x42F2 => element!(input, header.max_id_length, uint),
-            0x42F3 => element!(input, header.max_size_length, uint),
-            0x4282 => element!(input, header.doc_type, string),
-            0x4287 => element!(input, header.doc_type_version, uint),
-            0x4285 => element!(input, header.doc_type_read_version, uint),
-            _ => skip!(input, id),
+    pub fn parse(input: &[u8]) -> IResult<&[u8], EBMLHeader> {
+        let (input, size) = vsize(input)?;
+        if input.len() < size {
+            return Err(nom::Err::Incomplete(::nom::Needed::Size(size)));
         }
+
+        let rest = &input[size..];
+        let mut input = &input[0..size];
+
+        let mut header = EBMLHeader {
+            version: 1,
+            read_version: 1,
+            max_id_length: 4,
+            max_size_length: 8,
+            doc_type: "matroska".into(),
+            doc_type_version: 1,
+            doc_type_read_version: 1,
+        };
+
+        while !input.is_empty() {
+            let id;
+            element!(input, id, vid);
+            match id {
+                0x4286 => element!(input, header.version, uint),
+                0x42F7 => element!(input, header.read_version, uint),
+                0x42F2 => element!(input, header.max_id_length, uint),
+                0x42F3 => element!(input, header.max_size_length, uint),
+                0x4282 => element!(input, header.doc_type, string),
+                0x4287 => element!(input, header.doc_type_version, uint),
+                0x4285 => element!(input, header.doc_type_read_version, uint),
+                _ => skip!(input, id),
+            }
+        }
+
+        Ok((rest, header))
     }
-
-    Ok((rest, header))
 }
 
-pub struct EBMLSegment {
-    pub size: u64,
+pub struct EBMLSegment<'a> {
+    pub content: &'a [u8],
 }
 
-pub fn ebml_segment(input: &[u8]) -> IResult<&[u8], EBMLSegment> {
-    let mut segment = EBMLSegment {
-        size: 0
-    };
+impl<'a> EBMLSegment<'a> {
+    const ID: &'static [u8] = &[0x18u8, 0x53, 0x80, 0x67];
 
-    let (input, _) = nom::take_until_and_consume!(input, SEGMENT_ID)?;
-    let (input, size) = vint(input)?;
-    segment.size = size;
+    pub fn parse(input: &[u8]) -> IResult<&[u8], EBMLSegment> {
+        let (input, _) = nom::take_until_and_consume!(input, EBMLSegment::ID)?;
+        let (input, size) = vint(input)?;
+        let (input, content) = nom::take!(input, size)?;
 
-    Ok((input, segment))
+        Ok((input, EBMLSegment { content }))
+    }
 }
 
-const EBML_ID: &[u8] = &[0x1Au8, 0x45, 0xDF, 0xA3];
-const SEGMENT_ID: &[u8] = &[0x18u8, 0x53, 0x80, 0x67];
-
-pub fn ebml_file(input: &[u8]) -> IResult<&[u8], (EBMLHeader, EBMLSegment)> {
-    let (input, _) = nom::take_until_and_consume!(input, EBML_ID)?;
-    let (input, header) = ebml_header(input)?;
-    let (input, segment) = ebml_segment(input)?;
+pub fn parse(input: &[u8]) -> IResult<&[u8], (EBMLHeader, EBMLSegment)> {
+    let (input, _) = nom::take_until_and_consume!(input, EBMLHeader::ID)?;
+    let (input, header) = EBMLHeader::parse(input)?;
+    let (input, segment) = EBMLSegment::parse(input)?;
     Ok((input, (header, segment)))
 }
 
@@ -258,18 +261,18 @@ mod tests {
         let id = vid(&bytes).unwrap().1;
         assert_eq!(id, 0x4286);
 
-        let id = vid(&EBML_ID).unwrap().1;
+        let id = vid(&EBMLHeader::ID).unwrap().1;
         assert_eq!(id, 0x1a45dfa3);
     }
 
     #[test]
     fn test_ebml_header() {
-        let res = ebml_file(&WEBM[..100]);
+        let res = parse(&WEBM[..100]);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "webm");
 
-        let res = ebml_file(&SINGLE_STREAM[..100]);
+        let res = parse(&SINGLE_STREAM[..100]);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "matroska");
