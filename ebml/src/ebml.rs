@@ -63,6 +63,11 @@ pub fn uint(input: &[u8]) -> IResult<&[u8], u64> {
     Ok((&input[size..], val))
 }
 
+pub fn bool(input: &[u8]) ->IResult<&[u8], bool> {
+    let (i, val) = uint(input)?;
+    Ok((i, val != 0))
+}
+
 pub fn float(input: &[u8]) -> IResult<&[u8], f64> {
     let (input, size) = vsize(input)?;
 
