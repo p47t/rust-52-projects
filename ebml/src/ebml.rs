@@ -63,6 +63,20 @@ pub fn uint(input: &[u8]) -> IResult<&[u8], u64> {
     Ok((&input[size..], val))
 }
 
+pub fn float(input: &[u8]) -> IResult<&[u8], f64> {
+    let (input, size) = vsize(input)?;
+
+    if size == 4 {
+        let (input, val) = nom::be_f32(input)?;
+        Ok((input, val as f64))
+    } else if size == 8 {
+        let (input, val) = nom::be_f64(input)?;
+        Ok((input, val))
+    } else {
+        Ok((input, 0f64))
+    }
+}
+
 pub fn string(input: &[u8]) -> IResult<&[u8], String> {
     let (input, size) = vsize(input)?;
     if input.len() < size {
@@ -89,17 +103,17 @@ pub fn skip(input: &[u8]) -> IResult<&[u8], usize> {
 
 macro_rules! element {
     ($input: expr, $output: expr, $func: expr) => {{
-        let (i, val) = $func($input)?;
-        $input = i;
-        $output = val;
+        let (_i, _val) = $func($input)?;
+        $input = _i;
+        $output = _val;
     }};
 }
 
 macro_rules! skip {
     ($input: expr, $id: expr) => {{
-        let (i, size) = skip($input)?;
-        $input = i;
-        eprintln!("Ignore element {:x} of {:x} bytes", $id, size);
+        let (_i, _size) = skip($input)?;
+        $input = _i;
+        eprintln!("Ignore element {:x} of {:x} bytes", $id, _size);
     }};
 }
 
