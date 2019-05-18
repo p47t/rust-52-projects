@@ -1,7 +1,7 @@
 use nom::IResult;
 use crate::ebml::{vid, vint, skip, binary, uint};
 
-pub enum SegmentElement {
+pub enum Level1Element {
     SeekHead(SeekHead),
     Info,
     Tracks,
@@ -23,7 +23,7 @@ pub struct Seek {
     pub position: u64,
 }
 
-pub fn seek_head(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn seek_head(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, mut data) = nom::take!(input, size)?;
 
@@ -41,7 +41,7 @@ pub fn seek_head(input: &[u8]) -> IResult<&[u8], SegmentElement> {
         }
     }
 
-    Ok((input, SegmentElement::SeekHead(seek_head)))
+    Ok((input, Level1Element::SeekHead(seek_head)))
 }
 
 pub fn seek_element(input: &[u8]) -> IResult<&[u8], Seek> {
@@ -65,49 +65,49 @@ pub fn seek_element(input: &[u8]) -> IResult<&[u8], Seek> {
     Ok((input, seek))
 }
 
-pub fn info(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn info(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Info))
+    Ok((input, Level1Element::Info))
 }
 
-pub fn cluster(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn cluster(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Cluster))
+    Ok((input, Level1Element::Cluster))
 }
 
-pub fn chapters(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn chapters(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Chapters))
+    Ok((input, Level1Element::Chapters))
 }
 
-pub fn tags(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn tags(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Tags))
+    Ok((input, Level1Element::Tags))
 }
 
-pub fn attachments(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn attachments(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Attachments))
+    Ok((input, Level1Element::Attachments))
 }
 
-pub fn tracks(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn tracks(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Tracks))
+    Ok((input, Level1Element::Tracks))
 }
 
-pub fn cues(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn cues(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, size) = vint(input)?;
     let (input, _) = nom::take!(input, size)?;
-    Ok((input, SegmentElement::Cues))
+    Ok((input, Level1Element::Cues))
 }
 
-pub fn mkv_level1_element(input: &[u8]) -> IResult<&[u8], SegmentElement> {
+pub fn level1_element(input: &[u8]) -> IResult<&[u8], Level1Element> {
     let (input, id) = vid(input)?;
     match id {
         0x114D9B74 => seek_head(input),
@@ -120,11 +120,11 @@ pub fn mkv_level1_element(input: &[u8]) -> IResult<&[u8], SegmentElement> {
         0x1C53BB6B => cues(input),
         0xEC => {
             let (input, size) = skip(input)?;
-            Ok((input, SegmentElement::Void(size as u64)))
+            Ok((input, Level1Element::Void(size as u64)))
         }
         _ => {
             let (input, size) = skip(input)?;
-            Ok((input, SegmentElement::Unknown(size as u64)))
+            Ok((input, Level1Element::Unknown(size as u64)))
         }
     }
 }
@@ -142,43 +142,43 @@ mod tests {
         assert!(res.is_ok());
         let (input, (_, _)) = res.unwrap();
 
-        let res = mkv_level1_element(input);
+        let res = level1_element(input);
         assert!(res.is_ok());
         let (input, element) = res.unwrap();
         match element {
-            SegmentElement::SeekHead(_) => (),
+            Level1Element::SeekHead(_) => (),
             _ => panic!()
         }
 
-        let res = mkv_level1_element(input);
+        let res = level1_element(input);
         assert!(res.is_ok());
         let (input, element) = res.unwrap();
         match element {
-            SegmentElement::Info => (),
+            Level1Element::Info => (),
             _ => panic!()
         }
 
-        let res = mkv_level1_element(input);
+        let res = level1_element(input);
         assert!(res.is_ok());
         let (input, element) = res.unwrap();
         match element {
-            SegmentElement::Tracks => (),
+            Level1Element::Tracks => (),
             _ => panic!()
         }
 
-        let res = mkv_level1_element(input);
+        let res = level1_element(input);
         assert!(res.is_ok());
         let (input, element) = res.unwrap();
         match element {
-            SegmentElement::Cues => (),
+            Level1Element::Cues => (),
             _ => panic!()
         }
 
-        let res = mkv_level1_element(input);
+        let res = level1_element(input);
         assert!(res.is_ok());
         let (_input, element) = res.unwrap();
         match element {
-            SegmentElement::Cluster => (),
+            Level1Element::Cluster => (),
             _ => panic!()
         }
     }
