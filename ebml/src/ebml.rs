@@ -272,12 +272,12 @@ mod tests {
 
     #[test]
     fn test_ebml_header() {
-        let res = parse(&WEBM[..100]);
+        let res = parse(&WEBM);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "webm");
 
-        let res = parse(&SINGLE_STREAM[..100]);
+        let res = parse(&SINGLE_STREAM);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "matroska");
