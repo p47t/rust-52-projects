@@ -6,5 +6,4 @@ edition = "2018"
 
 [dependencies]
 rustyline = "3.0.0"
-failure = "0.1.5"
 nom = "4.2.3"
