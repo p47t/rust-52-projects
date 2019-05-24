@@ -1,10 +1,11 @@
 #[macro_use]
 extern crate nom;
 
-use rustyline::Editor;
-use std::process::{Stdio, Child};
-use std::str::from_utf8;
 use std::io::Error;
+use std::process::{Child, Stdio};
+use std::str::from_utf8;
+
+use rustyline::Editor;
 
 trait Executable {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error>;

@@ -1,6 +1,7 @@
-use bytes::{Buf, BufMut, BytesMut};
-use std::io::{Cursor, Read, Write};
 use std::fs::File;
+use std::io::{Cursor, Read, Write};
+
+use bytes::{Buf, BufMut, BytesMut};
 
 const BLOCK_SIZE: usize = 512;
 

@@ -1,6 +1,7 @@
+use failure::{err_msg, Error};
+
 use crate::client::Client;
 use crate::server::Server;
-use failure::{Error, err_msg};
 
 mod server;
 mod client;
@@ -37,8 +38,8 @@ fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use crate::client::Client;
-    use crate::server::Server;
     use crate::DEFAULT_SERVER_ADDR;
+    use crate::server::Server;
 
     #[test]
     #[ignore]

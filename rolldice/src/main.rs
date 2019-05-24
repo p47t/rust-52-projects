@@ -1,6 +1,7 @@
-use structopt::StructOpt;
 use rand::Rng;
-use rolldice::{RollResult, multizip};
+use structopt::StructOpt;
+
+use rolldice::{multizip, RollResult};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "rolldice", bin_name = "rolldice", about = "Rolls some numbers of 6 sided dice.")]

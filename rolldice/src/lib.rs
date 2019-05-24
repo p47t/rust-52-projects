@@ -1,6 +1,7 @@
+use std::fmt::{Display, Error, Formatter};
+
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
-use std::fmt::{Display, Formatter, Error};
 
 #[derive(Debug, PartialEq)]
 pub enum RollResult {
@@ -103,7 +104,7 @@ impl<I: Iterator> Iterator for MultiZip<I> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{RollResult, multizip};
+    use crate::{multizip, RollResult};
 
     #[test]
     fn dice_from_number() {

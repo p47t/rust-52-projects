@@ -1,6 +1,7 @@
-use std::net::UdpSocket;
-use crate::tftp::{Sender, Receiver, Packet, LockStep};
 use std::io;
+use std::net::UdpSocket;
+
+use crate::tftp::{LockStep, Packet, Receiver, Sender};
 
 pub struct Server {}
 
