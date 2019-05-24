@@ -4,5 +4,6 @@ members = [
   "rolldice",
   "tftp",
   "shell",
-  "ebml"
+  "ebml",
+  "game-server",
 ]

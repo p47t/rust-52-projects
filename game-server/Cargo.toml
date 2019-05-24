@@ -1,0 +1,11 @@
+[package]
+name = "game-server"
+version = "0.1.0"
+authors = ["Patrick Tsai <patrick@simplypatrick.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.1.27"
+tokio = "0.1.20"
+websocket = "0.22.4"
+failure = "0.1.5"
