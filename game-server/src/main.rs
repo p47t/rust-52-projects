@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use failure::Error;
@@ -9,7 +10,6 @@ use futures::sink::Sink;
 use websocket::OwnedMessage;
 use websocket::server::InvalidConnection;
 use websocket::server::r#async::Server;
-use std::thread;
 
 #[derive(Default)]
 pub struct Entity {
@@ -20,6 +20,16 @@ pub struct Entity {
 impl Entity {
     pub fn to_json(&self) -> String {
         format!("{{\"position\":{{\"x\":{},\"y\":{}}}, \"id\":{}}}", self.pos.0, self.pos.1, self.id)
+    }
+
+    fn process_message(&mut self, txt: &str) {
+        match txt {
+            "R" => { self.pos.0 += 10; }
+            "L" => { self.pos.0 -= 10; }
+            "D" => { self.pos.1 += 10; }
+            "U" => { self.pos.1 -= 10; }
+            _ => {}
+        }
     }
 }
 
@@ -136,15 +146,6 @@ fn main() -> Result<(), Error> {
 
 fn process_message(id: u32, msg: &OwnedMessage, entities: Arc<RwLock<HashMap<u32, Entity>>>) {
     if let OwnedMessage::Text(ref txt) = *msg {
-        println!("thread {:?}: receive msg '{}' from id {}", thread::current().id(), txt, id);
-        entities.write().unwrap().entry(id).and_modify(|e|
-            match txt.as_str() {
-                "R" => { e.pos.0 += 10; }
-                "L" => { e.pos.0 -= 10; }
-                "D" => { e.pos.1 += 10; }
-                "U" => { e.pos.1 -= 10; }
-                _ => {}
-            }
-        );
+        entities.write().unwrap().entry(id).and_modify(|e| e.process_message(txt));
     }
 }
