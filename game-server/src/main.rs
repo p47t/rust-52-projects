@@ -9,6 +9,7 @@ use futures::sink::Sink;
 use websocket::OwnedMessage;
 use websocket::server::InvalidConnection;
 use websocket::server::r#async::Server;
+use std::thread;
 
 #[derive(Default)]
 pub struct Entity {
@@ -24,7 +25,6 @@ impl Entity {
 
 fn main() -> Result<(), Error> {
     let runtime = tokio::runtime::Builder::new().build()?;
-    let executor = runtime.executor();
     let server = Server::bind("127.0.0.1:8080", &tokio::reactor::Handle::default())?;
 
     let connections = Arc::new(RwLock::new(HashMap::new()));
@@ -35,16 +35,16 @@ fn main() -> Result<(), Error> {
         let connections = connections.clone();
         let entities = entities.clone();
         let counter = counter.clone();
-        let executor = executor.clone();
 
         server.incoming()
             .map_err(|InvalidConnection { error, .. }| error)
-            .for_each(move |(upgrade, _addr)| {
+            .for_each(move |(upgrade, addr)| {
+                println!("client addr: {}", addr);
+
                 let accept = {
                     let connections = connections.clone();
                     let entities = entities.clone();
                     let counter = counter.clone();
-                    let executor = executor.clone();
 
                     upgrade.accept().and_then(move |(framed, _)| {
                         let (sink, stream) = framed.split();
@@ -55,6 +55,7 @@ fn main() -> Result<(), Error> {
                             *c += 1;
                         }
                         let id = *counter.read().unwrap();
+                        println!("new client {}", id);
 
                         // add id to Sink mapping
                         connections.write().unwrap().insert(id, sink);
@@ -63,15 +64,16 @@ fn main() -> Result<(), Error> {
 
                         // spawn a task to handle message from this client
                         let fut = stream.for_each(move |msg| {
+                            println!("message for client {}", id);
                             process_message(id, &msg, entities.clone());
                             Ok(())
                         }).map_err(|_| ());
-                        executor.spawn(fut);
+                        tokio::spawn(fut);
 
                         Ok(())
                     }).map_err(|_| ())
                 };
-                executor.spawn(accept);
+                tokio::spawn(accept);
                 Ok(())
             }).map_err(|_| ())
     };
@@ -79,16 +81,15 @@ fn main() -> Result<(), Error> {
     let send_handler = {
         let connections = connections.clone();
         let entities = entities.clone();
-        let executor = executor.clone();
 
         futures::future::loop_fn((), move |_| {
             let connections = connections.clone();
             let entities = entities.clone();
-            let executor = executor.clone();
 
             tokio::timer::Delay::new(Instant::now() + Duration::from_millis(100))
                 .map_err(|_| ())
                 .and_then(move |_| {
+                    println!("thread {:?}: broadcast game state", thread::current().id());
                     let mut conn = connections.write().unwrap();
 
                     let ids = conn.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>();
@@ -118,7 +119,7 @@ fn main() -> Result<(), Error> {
                                 })
                                 .map_err(|_| ())
                         };
-                        executor.spawn(fut);
+                        tokio::spawn(fut);
                     }
 
                     Ok(Loop::Continue(()))
@@ -133,4 +134,17 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn process_message(_id: u32, _msg: &OwnedMessage, _entities: Arc<RwLock<HashMap<u32, Entity>>>) {}
+fn process_message(id: u32, msg: &OwnedMessage, entities: Arc<RwLock<HashMap<u32, Entity>>>) {
+    if let OwnedMessage::Text(ref txt) = *msg {
+        println!("thread {:?}: receive msg '{}' from id {}", thread::current().id(), txt, id);
+        entities.write().unwrap().entry(id).and_modify(|e|
+            match txt.as_str() {
+                "R" => { e.pos.0 += 10; }
+                "L" => { e.pos.0 -= 10; }
+                "D" => { e.pos.1 += 10; }
+                "U" => { e.pos.1 -= 10; }
+                _ => {}
+            }
+        );
+    }
+}
