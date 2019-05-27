@@ -34,7 +34,6 @@ impl Entity {
 }
 
 fn main() -> Result<(), Error> {
-    let runtime = tokio::runtime::Builder::new().build()?;
     let server = Server::bind("127.0.0.1:8080", &tokio::reactor::Handle::default())?;
 
     let connections = Arc::new(RwLock::new(HashMap::new()));
@@ -137,7 +136,7 @@ fn main() -> Result<(), Error> {
         })
     };
 
-    runtime.block_on_all(conn_handler.select(send_handler))
+    tokio::runtime::current_thread::block_on_all(conn_handler.select(send_handler))
         .map_err(|_| println!("Error while running core loop"))
         .unwrap();
 
