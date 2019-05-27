@@ -69,7 +69,7 @@ fn main() -> Result<(), Error> {
                         // add id to Sink mapping
                         connections.write().unwrap().insert(id, sink);
                         // add id to Entity mapping
-                        entities.write().unwrap().insert(id, Entity::default());
+                        entities.write().unwrap().insert(id, Entity { id, ..Default::default() });
 
                         // spawn a task to handle message from this client
                         let fut = stream.for_each(move |msg| {
