@@ -1,6 +1,6 @@
 My second rust app is to implement TFTP (RFC-1350) client/server.
 
-Things I learned:
+### Things I Learned
 
 - Use trait to reuse code with static dispatching
 - Use failure crate to handle various errors
