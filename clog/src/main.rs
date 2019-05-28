@@ -13,15 +13,24 @@ pub enum Field<'a> {
     Space(&'static str, &'a str), // TODO: figure out a better name
 }
 
+impl<'a> Field<'a> {
+    fn format(&self, style: &HashMap<&str, &str>) -> Result<String, NoneError> {
+        match *self {
+            Field::Plain(ft, text) => Ok(format!("{}", text.color(*style.get(ft)?))),
+            Field::Space(ft, text) => Ok(format!(" {}", text.color(*style.get(ft)?))),
+        }
+    }
+}
+
 fn main() -> Result<(), NoneError> {
-    let style: HashMap<&str, String> = [
-        ("text", "white".to_string()),
-        ("time", "cyan".to_string()),
-        ("source", "green".to_string()),
-        ("thread", "cyan".to_string()),
-        ("info", "yellow".to_string()),
-        ("warning", "magenta".to_string()),
-        ("error", "red".to_string()),
+    let style: HashMap<&str, &str> = [
+        ("text", "white"),
+        ("time", "cyan"),
+        ("source", "green"),
+        ("thread", "cyan"),
+        ("info", "yellow"),
+        ("warning", "magenta"),
+        ("error", "red"),
     ].iter().cloned().collect();
 
     let mut line = String::new();
@@ -31,14 +40,7 @@ fn main() -> Result<(), NoneError> {
         }
         if let Ok(fields) = crate::fuchsia::parse_line(&line) {
             for field in fields {
-                match field {
-                    Field::Plain(ft, text) => {
-                        print!("{}", text.color(style.get(&ft as &str)?.as_str()))
-                    }
-                    Field::Space(ft, text) => {
-                        print!(" {}", text.color(style.get(&ft as &str)?.as_str()))
-                    }
-                }
+                print!("{}", field.format(&style)?);
             }
             print!("\n");
         }
