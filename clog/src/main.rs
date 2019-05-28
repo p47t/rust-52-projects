@@ -8,17 +8,31 @@ use colored::*;
 mod fuchsia;
 
 #[derive(PartialEq, Debug)]
-pub enum Field<'a> {
-    Plain(&'static str, &'a str),
-    Space(&'static str, &'a str), // TODO: figure out a better name
+pub struct Field<'a> {
+    prefix: &'static str,
+    tag: &'static str,
+    content: &'a str,
+    postfix: &'static str
 }
 
 impl<'a> Field<'a> {
+    fn new(prefix: &'static str, tag: &'static str, content: &'a str, postfix: &'static str) -> Self {
+        Field{prefix, tag, content, postfix}
+    }
+
+    fn pos(tag: &'static str, content: &'a str, postfix: &'static str) -> Self {
+        Field{prefix: "", tag, content, postfix}
+    }
+
+    fn pre(prefix: &'static str, tag: &'static str, content: &'a str) -> Self {
+        Field{prefix, tag, content, postfix: ""}
+    }
+
     fn format(&self, style: &HashMap<&str, &str>) -> Result<String, NoneError> {
-        match *self {
-            Field::Plain(ft, text) => Ok(format!("{}", text.color(*style.get(ft)?))),
-            Field::Space(ft, text) => Ok(format!(" {}", text.color(*style.get(ft)?))),
-        }
+        Ok(format!("{}{}{}",
+                   self.prefix.color(*style.get("text")?),
+                   self.content.color(*style.get(self.tag)?),
+                   self.postfix.color(*style.get("text")?)))
     }
 }
 
@@ -28,7 +42,7 @@ fn main() -> Result<(), NoneError> {
         ("time", "cyan"),
         ("source", "green"),
         ("thread", "cyan"),
-        ("info", "yellow"),
+        ("info", "white"),
         ("warning", "magenta"),
         ("error", "red"),
     ].iter().cloned().collect();
