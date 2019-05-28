@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::option::NoneError;
 
-use clap::{App, Arg};
 use colored::*;
 
 mod fuchsia;
@@ -15,22 +14,6 @@ pub enum Field<'a> {
 }
 
 fn main() -> Result<(), NoneError> {
-    let matches = App::new("clog")
-        .version("1.0")
-        .author("Patrick Tsai")
-        .about("Color your log")
-        .arg(Arg::with_name("format")
-            .short("f")
-            .long("format")
-            .default_value("auto")
-            .help("Specify the log format"))
-        .get_matches();
-
-    match matches.value_of("format")? {
-        "auto" => println!("detect format automatically"),
-        f => println!("use format {}", f),
-    }
-
     let style: HashMap<&str, String> = [
         ("text", "white".to_string()),
         ("time", "cyan".to_string()),
