@@ -1,4 +1,7 @@
+#![feature(try_trait)]
+
 use std::collections::HashMap;
+use std::option::NoneError;
 
 use clap::{App, Arg};
 use colored::*;
@@ -6,12 +9,12 @@ use colored::*;
 mod fuchsia;
 
 #[derive(PartialEq, Debug)]
-pub enum Field {
-    Plain(String, String),
-    Space(String, String), // TODO: figure out a better name
+pub enum Field<'a> {
+    Plain(&'static str, &'a str),
+    Space(&'static str, &'a str), // TODO: figure out a better name
 }
 
-fn main() {
+fn main() -> Result<(), NoneError> {
     let matches = App::new("clog")
         .version("1.0")
         .author("Patrick Tsai")
@@ -23,7 +26,7 @@ fn main() {
             .help("Specify the log format"))
         .get_matches();
 
-    match matches.value_of("format").unwrap() {
+    match matches.value_of("format")? {
         "auto" => println!("detect format automatically"),
         f => println!("use format {}", f),
     }
@@ -47,10 +50,10 @@ fn main() {
             for field in fields {
                 match field {
                     Field::Plain(ft, text) => {
-                        print!("{}", text.color(style.get(&ft as &str).unwrap().as_str()))
+                        print!("{}", text.color(style.get(&ft as &str)?.as_str()))
                     }
                     Field::Space(ft, text) => {
-                        print!(" {}", text.color(style.get(&ft as &str).unwrap().as_str()))
+                        print!(" {}", text.color(style.get(&ft as &str)?.as_str()))
                     }
                 }
             }
@@ -58,4 +61,6 @@ fn main() {
         }
         line.clear();
     }
+
+    Ok(())
 }
