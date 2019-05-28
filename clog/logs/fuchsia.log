@@ -1,0 +1,382 @@
+[00000.000] 00000:00000> zbi: @ 0xffffff8000e50000 (13943144 bytes)
+[00000.000] 00000:00000> UART: FIFO depth 16
+[00000.000] 00000:00000> PMM: boot reserve add [0x100000, 0x30bfff]
+[00000.000] 00000:00000> PMM: boot reserve add [0xe50000, 0x1b9cfff]
+[00000.000] 00000:00000> PMM: boot reserve marking WIRED [0x100000, 0x30bfff]
+[00000.000] 00000:00000> PMM: boot reserve marking WIRED [0xe50000, 0x1b9cfff]
+[00000.000] 00000:00000>
+[00000.000] 00000:00000> welcome to Zircon
+[00000.000] 00000:00000>
+[00000.000] 00000:00000> KASLR: .text section at 0xffffffff00100000
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff001178e4 (global_prng_seed) at level 0x30000, flags 0x1
+[00000.000] 00000:00000> initializing vm pre-heap
+[00000.000] 00000:00000> VM: marking boot alloc used range [0x1b9d000, 0x1b9d040)
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00124b40 (elf_build_id) at level 0x4fffe, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00124ccc (version) at level 0x4ffff, flags 0x1
+[00000.000] 00000:00000> version:
+[00000.000] 00000:00000> 	arch:     x86
+[00000.000] 00000:00000> 	platform: XXX
+[00000.000] 00000:00000> 	target:   XXX
+[00000.000] 00000:00000> 	project:  x64
+[00000.000] 00000:00000> 	buildid:  git-0d4917c4bcac9636ccd13bc155cbaa3ccf678a7d-dirty
+[00000.000] 00000:00000> 	ELF build ID: 94059d294a4c725d7031565cfb223b9fce4bc510
+[00000.000] 00000:00000> initializing heap
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00101f78 (console) at level 0x50000, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00186478 (x86_resource_init) at level 0x50000, flags 0x1
+[00000.000] 00000:00000> initializing vm
+[00000.000] 00000:00000> VM: reserving kernel region [0xffffffff00100000, 0xffffffff00224000) flags 0x28 name 'kernel_code'
+[00000.000] 00000:00000> VM: reserving kernel region [0xffffffff00224000, 0xffffffff00276000) flags 0x8 name 'kernel_rodata'
+[00000.000] 00000:00000> VM: reserving kernel region [0xffffffff00276000, 0xffffffff0027e000) flags 0x18 name 'kernel_data'
+[00000.000] 00000:00000> VM: reserving kernel region [0xffffffff0027e000, 0xffffffff0030c000) flags 0x18 name 'kernel_bss'
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00187188 (display_memtype) at level 0x60001, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff0018a500 (acpi_tables) at level 0x60001, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff0018527c (hpet) at level 0x60002, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff0018563c (apic) at level 0x60002, flags 0x1
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff001abfcc (system_topology_init) at level 0x60002, flags 0x1
+[00000.000] 00000:00000> WARNING: unable to find any cache levels.
+[00000.000] 00000:00000> WARNING: unable to find any cache levels.
+[00000.000] 00000:00000> Could not find SRAT table. ACPICA returned: 5
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00189af0 (timer) at level 0x60003, flags 0x1
+[00000.000] 00000:00000> HPET frequency: 100000 ticks/ms
+[00000.000] 00000:00000> Could not find APIC frequency: Calibrating APIC with HPET
+[00000.000] 00000:00000> APIC timer calibrated: 999000 ticks/ms, divisor 1
+[00000.000] 00000:00000> Could not find TSC frequency: Calibrating TSC with HPET
+[00000.000] 00000:00000> TSC calibrated: 3492482 ticks/ms
+[00000.000] 00000:00000> timer features: constant_tsc 1 invariant_tsc 0 tsc_deadline 0
+[00000.000] 00000:00000> Using HPET as wallclock
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00214868 (percpu_heap_init) at level 0x60003, flags 0x1
+[00000.000] 00000:00000> initializing kernel
+[00000.000] 00000:00000> initializing mp
+[00000.000] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00117b38 (global_prng_thread_safe) at level 0x7ffff, flags 0x1
+[00000.000] 00000:00000> creating bootstrap completion thread
+[00000.003] 00000:00000> top of bootstrap2()
+[00000.003] 00000:00000> INIT: cpu 0, calling hook 0xffffffff0013419c (libobject) at level 0x80000, flags 0x1
+[00000.004] 00000:00000> OOM: started thread
+[00000.005] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00211678 (dpc) at level 0x80000, flags 0x1
+[00000.006] 00000:00000> Processor Model Info: type 0 family 0x6 model 0xc stepping 0x4
+[00000.006] 00000:00000> 	display_family 0x6 display_model 0x3c
+[00000.006] 00000:00000> Vendor: Intel
+[00000.006] 00000:00000> Microarch: Haswell
+[00000.006] 00000:00000> F/M/S: 6/3c/4
+[00000.006] 00000:00000> patch_level: 0
+[00000.006] 00000:00000> Brand: Intel Core Processor (Haswell)
+[00000.006] 00000:00000> Features: fpu sse sse2 sse3 ssse3 sse4.1 sse4.2 mmx fxsr xsave aesni clflush smep smap erms
+[00000.006] 00000:00000> syscall nx rdtscp hypervisor
+[00000.006] 00000:00000> Properties: meltdown l1tf
+[00000.007] 00000:00000> initializing platform
+[00000.007] 00000:00000> INIT: cpu 0, calling hook 0xffffffff001a5690 (x86_perfmon) at level 0x90000, flags 0x1
+[00000.007] 00000:00000> x86_perfmon_init_once:454: perfmon: unexpected programmable counter width 0 in cpuid.0AH
+[00000.007] 00000:00000> UART: started IRQ driven RX
+[00000.007] 00000:00000> UART: started IRQ driven TX
+[00000.007] 00000:00000> cpu topology:
+[00000.007] 00000:00000> 	0: apic id 0x0  BSP
+[00000.008] 00000:00000> 	1: apic id 0x1
+[00000.008] 00000:00000> 	2: apic id 0x2
+[00000.008] 00000:00000> 	3: apic id 0x3
+[00000.008] 00000:00000> Found 4 cpus
+[00000.009] 00000:00000> booting apic ids: 0x1 0x2 0x3
+[00000.023] 00000:00000> entering scheduler on cpu 1
+[00000.024] 00000:00000> entering scheduler on cpu 2
+[00000.025] 00000:00000> entering scheduler on cpu 3
+[00000.039] 00000:00000> smbios: manufacturer="QEMU" product="Standard PC (Q35 + ICH9, 2009)"
+[00000.039] 00000:00000> initializing target
+[00000.039] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00188da0 (x86_pcie_init) at level 0xa0000, flags 0x1
+[00000.041] 00000:00000> moving to last init level
+[00000.041] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00123d98 (debuglog) at level 0xb0000, flags 0x1
+[00000.042] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00178b58 (kcounters) at level 0xb0000, flags 0x1
+[00000.042] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00102aa0 (kernel_shell) at level 0xc0000, flags 0x1
+[00000.042] 00000:00000> INIT: cpu 0, calling hook 0xffffffff0020e0a0 (ktrace) at level 0xc0000, flags 0x1
+[00000.110] 00000:00000> ktrace: buffer at 0xffffff98b51f4000 (33554432 bytes)
+[00000.110] 00000:00000> INIT: cpu 0, calling hook 0xffffffff00221580 (userboot) at level 0xc0000, flags 0x1
+[00000.110] 00000:00000> userboot: ramdisk        0xd4d000 @ 0xffffff8000e50000
+[00000.123] 00000:00000> userboot: userboot rodata       0 @ [0x3b6d64e05000,0x3b6d64e08000)
+[00000.124] 00000:00000> userboot: userboot code    0x3000 @ [0x3b6d64e08000,0x3b6d64e13000)
+[00000.124] 00000:00000> userboot: vdso/full rodata       0 @ [0x3b6d64e13000,0x3b6d64e1a000)
+[00000.124] 00000:00000> userboot: vdso/full code    0x7000 @ [0x3b6d64e1a000,0x3b6d64e1b000)
+[00000.126] 00000:00000> userboot: entry point             @ 0x3b6d64e08c90
+[00000.131] 01033:01040> userboot: option "/Volumes/MX500/fuchsia/out/workstation.x64/../workstation.x64.zircon/multiboot.bin="
+[00000.131] 01033:01040> userboot: option "TERM=xterm-256color"
+[00000.131] 01033:01040> userboot: option "kernel.serial=legacy"
+[00000.131] 01033:01040> userboot: option "kernel.entropy-mixin.redacted=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+[00000.131] 01033:01040> userboot: option "kernel.halt-on-panic=true"
+[00000.131] 01033:01040> userboot: option "multiboot.boot_loader_name=qemu"
+[00000.329] 01033:01040> userboot: searching bootfs for 'bin/bootsvc'
+[00000.330] 01033:01040> userboot: 'bin/bootsvc' has PT_INTERP "lib/ld.so.1"
+[00000.330] 01033:01040> userboot: searching bootfs for 'lib/ld.so.1'
+[00000.332] 01033:01040> userboot: userboot: loaded lib/ld.so.1 at 0x6d3835418000, entry point 0x6d3835436890
+[00000.334] 01033:01040> userboot: userboot: loaded vDSO at 0x4cbc21e09000, entry point 0x4cbc21e10907
+[00000.335] 01033:01040> userboot: process bin/bootsvc started.
+[00000.335] 01033:01040> userboot: waiting for loader-service requests...
+[00000.340] 01033:01040> userboot: searching bootfs for 'lib/libc++.so.2'
+[00000.343] 01033:01040> userboot: searching bootfs for 'lib/libunwind.so.1'
+[00000.344] 01033:01040> userboot: searching bootfs for 'lib/libc++abi.so.1'
+[00000.346] 01033:01040> userboot: searching bootfs for 'lib/libfdio.so'
+[00000.347] 01033:01040> userboot: searching bootfs for 'lib/libtrace-engine.so'
+[00000.348] 01033:01040> userboot: searching bootfs for 'lib/libasync-default.so'
+[00000.349] 01033:01040> userboot: searching bootfs for 'lib/liblaunchpad.so'
+[00000.359] 01047:01050> {{{reset}}}
+[00000.359] 01047:01050> {{{module:0:<application>:elf:dce144778041015efdb40504e84f68c295777128}}}
+[00000.359] 01047:01050> {{{mmap:0x30df427aa000:0x3a000:load:0:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x30df427e5000:0x4000:load:0:rw:0x3b000}}}
+[00000.359] 01047:01050> dso: id=dce144778041015efdb40504e84f68c295777128 base=0x000030df427aa000 name=<application>
+[00000.359] 01047:01050> {{{module:0x2:<vDSO>:elf:9ef74630745dab3ea99d9e7f11415a7db2244e25}}}
+[00000.359] 01047:01050> {{{mmap:0x4cbc21e09000:0x7000:load:0x2:r:0}}}
+[00000.359] 01047:01050> {{{mmap:0x4cbc21e10000:0x1000:load:0x2:rx:0x7000}}}
+[00000.359] 01047:01050> dso: id=9ef74630745dab3ea99d9e7f11415a7db2244e25 base=0x00004cbc21e09000 name=<vDSO>
+[00000.359] 01047:01050> {{{module:0x6:libfdio.so:elf:652a7508e4d6e401bb8377475d4a555699cc8349}}}
+[00000.359] 01047:01050> {{{mmap:0x1e643f9c000:0x38000:load:0x6:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x1e643fd5000:0x6000:load:0x6:rw:0x39000}}}
+[00000.359] 01047:01050> dso: id=652a7508e4d6e401bb8377475d4a555699cc8349 base=0x000001e643f9c000 name=libfdio.so
+[00000.359] 01047:01050> {{{module:0x7:libtrace-engine.so:elf:aa3e4573d3b1659a5366b8912d0406dab09bb761}}}
+[00000.359] 01047:01050> {{{mmap:0x3741d1071000:0x9000:load:0x7:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x3741d107a000:0x2000:load:0x7:rw:0x9000}}}
+[00000.359] 01047:01050> dso: id=aa3e4573d3b1659a5366b8912d0406dab09bb761 base=0x00003741d1071000 name=libtrace-engine.so
+[00000.359] 01047:01050> {{{module:0x8:libasync-default.so:elf:4e77598045d6a046fa846a9da451862380991191}}}
+[00000.359] 01047:01050> {{{mmap:0x5d81c2bd9000:0x1000:load:0x8:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x5d81c2bda000:0x1000:load:0x8:rw:0x1000}}}
+[00000.359] 01047:01050> dso: id=4e77598045d6a046fa846a9da451862380991191 base=0x00005d81c2bd9000 name=libasync-default.so
+[00000.359] 01047:01050> {{{module:0x9:liblaunchpad.so:elf:fff5034be3a04522c0987ae5838334f2143c4923}}}
+[00000.359] 01047:01050> {{{mmap:0x17c813c98000:0x7000:load:0x9:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x17c813c9f000:0x2000:load:0x9:rw:0x7000}}}
+[00000.359] 01047:01050> dso: id=fff5034be3a04522c0987ae5838334f2143c4923 base=0x000017c813c98000 name=liblaunchpad.so
+[00000.359] 01047:01050> {{{module:0x3:libc++.so.2:elf:c40e3db9703e022b}}}
+[00000.359] 01047:01050> {{{mmap:0x76571917b000:0x53000:load:0x3:r:0}}}
+[00000.359] 01047:01050> {{{mmap:0x7657191ce000:0x7e000:load:0x3:rx:0x53000}}}
+[00000.359] 01047:01050> {{{mmap:0x76571924c000:0x5000:load:0x3:rw:0xd1000}}}
+[00000.359] 01047:01050> {{{mmap:0x765719251000:0x3000:load:0x3:rw:0xd6000}}}
+[00000.359] 01047:01050> dso: id=c40e3db9703e022b base=0x000076571917b000 name=libc++.so.2
+[00000.359] 01047:01050> {{{module:0x4:libunwind.so.1:elf:53013261665bb49a}}}
+[00000.359] 01047:01050> {{{mmap:0x2bdbc3802000:0x6000:load:0x4:r:0}}}
+[00000.359] 01047:01050> {{{mmap:0x2bdbc3808000:0x8000:load:0x4:rx:0x6000}}}
+[00000.359] 01047:01050> {{{mmap:0x2bdbc3810000:0x1000:load:0x4:rw:0xe000}}}
+[00000.359] 01047:01050> {{{mmap:0x2bdbc3811000:0x1000:load:0x4:rw:0xf000}}}
+[00000.359] 01047:01050> dso: id=53013261665bb49a base=0x00002bdbc3802000 name=libunwind.so.1
+[00000.359] 01047:01050> {{{module:0x5:libc++abi.so.1:elf:7dd43029d9b84d36}}}
+[00000.359] 01047:01050> {{{mmap:0x4cdfc424d000:0x16000:load:0x5:r:0}}}
+[00000.359] 01047:01050> {{{mmap:0x4cdfc4263000:0x23000:load:0x5:rx:0x16000}}}
+[00000.359] 01047:01050> {{{mmap:0x4cdfc4286000:0x3000:load:0x5:rw:0x39000}}}
+[00000.359] 01047:01050> {{{mmap:0x4cdfc4289000:0x1000:load:0x5:rw:0x3c000}}}
+[00000.359] 01047:01050> dso: id=7dd43029d9b84d36 base=0x00004cdfc424d000 name=libc++abi.so.1
+[00000.359] 01047:01050> {{{module:0x1:libc.so:elf:bebb2cbddec28f0639092418da5f81db7814bb70}}}
+[00000.359] 01047:01050> {{{mmap:0x6d3835418000:0xa6000:load:0x1:rx:0}}}
+[00000.359] 01047:01050> {{{mmap:0x6d38354be000:0x5000:load:0x1:rw:0xa6000}}}
+[00000.359] 01047:01050> dso: id=bebb2cbddec28f0639092418da5f81db7814bb70 base=0x00006d3835418000 name=libc.so
+[00000.381] 01047:01050> bootsvc: Starting...
+[00000.383] 01047:01050> bootsvc: Creating bootfs service...
+[00000.385] 01033:01040> userboot: loader-service channel peer closed
+[00000.386] 01033:01040> userboot: finished!
+[00000.398] 01047:01050> bootsvc: Retrieving boot image...
+[00000.402] 01047:01050> bootsvc: Decommitted BOOTDATA VMO from 0 to 0xd4c000
+[00000.402] 01047:01050> bootsvc: Loading boot arguments...
+[00000.404] 01047:01050> bootsvc: Creating svcfs service...
+[00000.406] 01047:01050> bootsvc: Loading kernel VMOs...
+[00000.407] 01047:01050> bootsvc: Creating loader service...
+[00000.409] 01047:01050> bootsvc: Launching next process...
+[00000.411] 01047:01117> bootsvc: bootsvc.next = bin/devcoordinator
+[00000.424] 01047:01117> bootsvc: Launched bin/devcoordinator
+[00000.486] 01124:01140> devcoordinator: launch /boot/bin/svchost (svchost) OK
+[00000.554] 01124:01140> devcoordinator: launch /boot/bin/fshost (fshost) OK
+[00000.671] 01124:01374> devcoordinator: launch /boot/bin/miscsvc (miscsvc) OK
+[00000.683] 01124:01364> devcoordinator: launch /boot/bin/pwrbtn-monitor (pwrbtn-monitor) OK
+[00000.719] 01124:01374> devcoordinator: launch /boot/bin/netsvc (netsvc) OK
+[00000.778] 01124:01374> devcoordinator: launch /boot/bin/virtual-console (virtual-console) OK
+[00001.136] 01124:01140> devcoordinator: full system required, ignoring fallback drivers until /system is loaded
+[00001.144] 01124:01140> devcoordinator: launch devhost 'devhost:sys': pid=2455
+[00001.168] 01124:01140> devcoordinator: launch devhost 'devhost:test': pid=2499
+[00001.195] 01124:01140> devcoordinator: launch devhost 'devhost:root': pid=2559
+[00001.256] 01124:01140> devcoordinator: launch devhost 'devhost:misc': pid=2654
+[00001.617] 02455:02469> acpi-bus: not using IOMMU
+[00001.633] 01124:01369> devcoordinator: launch /boot/bin/sh (sh:console) OK
+[00001.670] 02455:02469> GetHwProperties: No PM support
+[00001.670] 02455:02469> IntelPT: No PT support
+[00001.674] 02455:02469> devhost[sys/cpu-trace] bind driver '/boot/driver/cpu-trace.so' failed: -2
+[00001.676] 01124:01140> devcoordinator: rpc: bind-driver 'cpu-trace' status -2
+[00001.688] 02455:02469> [sysmem_init 28] async_get_default_dispatcher(): 0x24e7e23a7150
+[00001.688] 02455:02469> [sysmem_bind 40] sysmem_bind()
+[00001.700] 02455:03164> acpi-pwrbtn: initialized
+[00001.767] 01761:01825> vc: new input device /dev/class/input/000
+[00002.012] 02455:03164> acpi: published device pci(0x24e7223ad670), parent=sys(0x24e8623a1710), handle=0x24e6e23a4a90
+[00002.012] 02455:03164> acpi: failed to get PCI base bus number for device 'PCI0' (status 4294967295)
+[00002.015] 02455:03164> acpi: published device rtc(0x24e72239b9d0), parent=acpi(0x24e8623a2b10), handle=0x24e6e23a4090
+[00002.023] 02455:03164> acpi: published device i8042(0x24e7223a2ab0), parent=acpi(0x24e8623a2b10), handle=0x24e6e23a4410
+[00002.047] 01124:01140> devcoordinator: launch devhost 'devhost:pci#1:1234:1111': pid=3311
+[00002.071] 01124:01140> devcoordinator: launch devhost 'devhost:pci#2:8086:2922': pid=3362
+[00002.108] 01124:01140> devcoordinator: launch devhost 'devhost:pci#3:8086:100e': pid=3437
+[00002.163] 01124:01140> devcoordinator: launch devhost 'devhost:pci#5:8086:2922': pid=3533
+[00002.210] 02455:02469> devhost: WARNING: driver '/boot/driver/pc-ps2.so' did not add device in bind()
+[00002.223] 02455:03651> i8042 device 0xab 0x41
+[00002.255] 01761:01825> vc: new input device /dev/class/input/001
+[00002.344] 03362:03377> ahci: using MSI interrupt
+[00002.393] 03362:03814> sata0: dev info
+[00002.393] 03362:03814>   serial=QM00013
+[00002.393] 03362:03814>   firmware rev=2.5+
+[00002.393] 03362:03814>   model id=QEMU HARDDISK
+[00002.393] 03362:03814>   major=0xf0 ATA/ATAPI DMA 32 commands
+[00002.394] 03362:03814>   LBA48 1278592 sectors,  sector size=512
+[00002.494] 03311:03325> bochs_vbe: initialized display, 1024 x 768 (stride=1024 format=00020001)
+[00002.533] 01340:01354> fshost: Binding: /boot/driver/fvm.so
+[00002.541] 03362:03377> DeviceControllerBind running: /boot/driver/fvm.so
+[00002.542] 01124:01140> devcoordinator: rpc: bind-device 'block'
+[00002.546] 03362:03377> DeviceControllerBind finished: /boot/driver/fvm.so ZX_OK
+[00002.597] 02455:03651> i8042 device 0x00
+[00002.608] 02455:02469> hid: boot mouse hack for "hid-device-002":  report count (0->1), inp sz (24->24), out sz (0->0), feat sz (0->0)
+[00002.609] 01761:01825> vc: new input device /dev/class/input/002
+[00002.620] 01761:01825> vc: new display device /dev/class/display-controller/000
+[00002.645] 03311:03325> GetSysmemConnection failed (continuing) - status: -2
+[00002.726] 01761:01825> vc: Successfully attached to display 1
+[00002.753] 03533:03576> ahci: using MSI interrupt
+[00002.849] 01340:01354> fshost: BlockDevice::MountFilesystem(blobfs)
+[00002.893] 01340:01354> devcoordinator: launch /boot/bin/blobfs (blobfs:/blob) OK
+[00004.283] 01340:01354> fshost: starting 'bin/pkgsvr' 'd9fe6e8bf798cd4b6909a4a0e2eaa20d07b559b0036a53b1f00a15a38a389385'...
+[00004.410] 01340:01354> devcoordinator: launch bin/pkgsvr (pkgfs) OK
+[00004.926] 04327:04569> pkgsvr: system: will be served from d9fe6e8bf798cd4b6909a4a0e2eaa20d07b559b0036a53b1f00a15a38a389385
+[00004.926] 04327:04569> pkgsvr: pkgfs serving index /data/pkgfs_index from blobfs /blob
+[00004.971] 01340:01354> fshost: mounting minfs
+[00005.044] 01340:01354> fshost: BlockDevice::MountFilesystem(minfs)
+[00005.169] 01340:01354> devcoordinator: launch /boot/bin/minfs (minfs:/data) OK
+[00005.392] 04697:04711> minfs: filesystem in clean state.
+[00005.659] 01124:04618> devcoordinator: adding system driver 'ath10k_pci' '/system/driver/ath10k.so'
+[00005.686] 01124:01836> devcoordinator: launch /system/bin/appmgr (appmgr) OK
+[00005.874] 01124:04618> devcoordinator: adding system driver 'rtl88xx' '/system/driver/rtl88xx.so'
+[00006.052] 01124:04618> devcoordinator: adding system driver 'brcmfmac' '/system/driver/brcmfmac.so'
+[00007.112] 01124:04618> devcoordinator: adding system driver 'wlan' '/system/driver/wlan.so'
+[00007.561] 01124:04618> devcoordinator: adding system driver 'bt_host' '/system/driver/bt-host.so'
+[00007.783] 01124:04618> devcoordinator: adding system driver 'wlan' '/system/driver/wlanphy.so'
+[00008.176] 01124:04618> devcoordinator: adding system driver 'bt_hci_atheros' '/system/driver/bt-hci-atheros.so'
+[00008.244] 01124:04618> devcoordinator: adding system driver 'iwlwifi_pci' '/system/driver/iwlwifi.so'
+[00008.466] 01124:04618> devcoordinator: adding system driver 'qmi_usb' '/system/driver/qmi-transport.so'
+[00008.530] 01124:04618> devcoordinator: adding system driver 'bt_hog' '/system/driver/bt-hog.so'
+[00008.726] 01124:04618> devcoordinator: adding system driver 'gpu' '/system/driver/libmsd_intel.so'
+[00009.606] 01124:04618> devcoordinator: adding system driver 'ralink' '/system/driver/ralink.so'
+[00009.843] 01124:04618> devcoordinator: adding system driver 'virtual_camera' '/system/driver/virtual_camera_driver.so'
+[00010.292] 01124:04618> devcoordinator: adding system driver 'bt_hci_intel' '/system/driver/bt-hci-intel.so'
+[00010.469] 01124:04618> devcoordinator: adding system driver 'wlan' '/system/driver/wlanif.so'
+[00010.677] 01124:04618> devcoordinator: adding system driver 'bt_hci_fake' '/system/driver/bt-hci-fake.so'
+[00010.915] 01124:04618> devcoordinator: adding system driver 'bt_hci_passthrough' '/system/driver/bt-hci-passthrough.so'
+[00010.933] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for sysmgr
+[00011.146] 01124:04618> devcoordinator: adding system driver 'usb_video' '/system/driver/usb_video.so'
+[00011.309] 01124:04618> devcoordinator: adding system driver 'virtual_audio' '/system/driver/virtual_audio_driver.so'
+[00011.365] 01124:01140> devcoordinator: driver 'usb_video' added
+[00011.365] 01124:01140> devcoordinator: driver 'bt_hci_fake' added
+[00011.365] 01124:01140> devcoordinator: driver 'wlan' added
+[00011.365] 01124:01140> devcoordinator: driver 'bt_hci_intel' added
+[00011.365] 01124:01140> devcoordinator: driver 'ralink' added
+[00011.365] 01124:01140> devcoordinator: driver 'gpu' added
+[00011.365] 01124:01140> devcoordinator: driver 'bt_hog' added
+[00011.365] 01124:01140> devcoordinator: driver 'qmi_usb' added
+[00011.365] 01124:01140> devcoordinator: driver 'iwlwifi_pci' added
+[00011.366] 01124:01140> devcoordinator: driver 'bt_hci_atheros' added
+[00011.366] 01124:01140> devcoordinator: driver 'wlan' added
+[00011.366] 01124:01140> devcoordinator: driver 'bt_host' added
+[00011.366] 01124:01140> devcoordinator: driver 'wlan' added
+[00011.366] 01124:01140> devcoordinator: driver 'brcmfmac' added
+[00011.366] 01124:01140> devcoordinator: driver 'rtl88xx' added
+[00011.366] 01124:01140> devcoordinator: driver 'ath10k_pci' added
+[00011.366] 01124:01140> devcoordinator: driver 'bt_hci_passthrough' added
+[00011.366] 01124:01140> devcoordinator: fallback driver 'usb_composite' is available
+[00011.366] 01124:01140> devcoordinator: driver 'usb_composite' added
+[00011.366] 01124:01140> devcoordinator: fallback driver 'intel_disp' is available
+[00011.366] 01124:01140> devcoordinator: driver 'intel_disp' added
+[00011.538] 01643:01686> netifc: ? /dev/class/ethernet/000
+[00011.552] 01643:01686> netifc: create 512 eth buffers
+[00011.637] 01643:01686> macaddr: 52:54:00:4d:27:96
+[00011.637] 01643:01686> ip6addr: fe80::5054:4d:fe4d:2796
+[00011.637] 01643:01686> snmaddr: ff02::1:ff4d:2796
+[00011.637] 01643:01686> netsvc: using /dev/class/ethernet/000
+[00011.640] 01643:01686> netsvc: nodename='ivy-donut-grew-stoop'
+[00011.640] 01643:01686> netsvc: start
+[00013.383] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for amber
+[00014.660] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for pkg_resolver
+[00017.534] 07734:07746> [INFO:cobalt_main.cc(219)] Cobalt is starting with the following parameters: schedule_interval=3600 seconds, min_interval=10 seconds, initial_interval=60 seconds, max_bytes_per_observation_store=1048576, event_aggregator_bac
+[00017.534] 07734:07746> kfill_days=2, start_event_aggregator_worker=1.
+[00018.798] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for wlancfg
+[00019.614] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for mdns
+[00021.671] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for basemgr
+[00023.928] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for crashpad_agent
+[00024.988] 09679:09694> [INFO:system_metrics_main.cc(23)] Cobalt SystemMetricsDaemon: System metrics daemon created.
+[00027.298] 08592:08607> Starting mDNS on interface ethp0003 fe80::5054:ff:fe4d:2796 using port 5356
+[00027.369] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(29)] NET-291 IPV6_MULTICAST_LOOP not supported (ENOPROTOOPT), continuing anyway
+[00027.385] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(50)] NET-2180 IPV6_JOIN_GROUP returned ENODEV, mDNS will not communicate via IPV6
+[00027.409] 08592:08607> Starting mDNS on interface ethp0003 ff02::1:ff4d:2796 using port 5356
+[00027.427] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(29)] NET-291 IPV6_MULTICAST_LOOP not supported (ENOPROTOOPT), continuing anyway
+[00027.434] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(50)] NET-2180 IPV6_JOIN_GROUP returned ENODEV, mDNS will not communicate via IPV6
+[00027.607] 11278:11301> wlanstack2 [I]: Starting
+[00029.287] 08592:08607> Starting mDNS on interface ethp0003 192.168.3.53 using port 5356
+[00029.388] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v4.cc(68)] NET-2177 IP_TTL not supported (ENOPROTOOPT), continuing anyway. May cause spurious IP traffic
+[00029.430] 09260:09285> [WARNING:src/lib/cobalt/cpp/cobalt_logger_impl.cc(39)] Disconnecting connection to cobalt with events still pending... Events will be lost.
+[00029.446] 08592:08607> Starting mDNS on interface ethp0003 ff02::1:ff4d:2796 using port 5356
+[00029.490] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(29)] NET-291 IPV6_MULTICAST_LOOP not supported (ENOPROTOOPT), continuing anyway
+[00029.515] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(50)] NET-2180 IPV6_JOIN_GROUP returned ENODEV, mDNS will not communicate via IPV6
+[00029.548] 08592:08607> Starting mDNS on interface ethp0003 fe80::5054:ff:fe4d:2796 using port 5356
+[00029.565] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(29)] NET-291 IPV6_MULTICAST_LOOP not supported (ENOPROTOOPT), continuing anyway
+[00029.579] 08592:08607> [WARNING:src/connectivity/network/mdns/service/mdns_interface_transceiver_v6.cc(50)] NET-2180 IPV6_JOIN_GROUP returned ENODEV, mDNS will not communicate via IPV6
+[00029.601] 08592:08607> mDNS: Verifying uniqueness of host name ivy-donut-grew-stoop.local.
+[00030.476] 08592:08607> mDNS: Using unique host name ivy-donut-grew-stoop.local.
+[00031.051] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for root_presenter
+[00031.788] 11805:11818> [INFO:input_interpreter.cc(387)] Can't process HID report descriptor for 000; All parsing attempts failed.
+[00033.165] 09260:09285> [INFO:session_user_provider_impl.cc(116)] AccountListener registered.
+[00033.242] 09260:09285> [INFO:presentation_container.cc(133)] Setting shadow technique to 0
+[00033.263] 09260:09285> [INFO:presentation_container.cc(36)] Setting display usage: 3
+[00033.281] 09260:09285> [INFO:presentation_container.cc(44)] Setting display size: 0 x 0
+[00037.713] 12540:12552> [INFO:a11y_input_system.cc(11)] Scenic accessibility input system started.
+[00037.752] 12540:12552> [INFO:display_watcher.cc(40)] Scenic: Acquired display controller /dev/class/display-controller/000.(000)
+[00037.792] 03311:03325> GetSysmemConnection failed (continuing) - status: -2
+[00039.543] 12740:12753> TraceProvider: RegisterTraceProviderSynchronously failed: status=-24(ZX_ERR_PEER_CLOSED)
+[00039.555] 12740:12753> [INFO:main.cc(30)] Flutter application services initialized.
+[00041.627] 12540:12552> ERROR: setupLoaderTermPhysDevs:  Failed to detect any valid GPUs in the current config
+[00041.627] 12540:12552> ERROR: setupLoaderTrampPhysDevs:  Failed during dispatch call of 'vkEnumeratePhysicalDevices' to lower layers or loader to get count.
+[00041.634] 12540:12552> [ERROR:garnet/lib/ui/gfx/gfx_system.cc(195)] No Vulkan on device, Graphics system exiting.
+[00041.641] 12540:12552> [INFO:input_system.cc(203)] Scenic input system initialized.
+[00041.667] 03311:03325> DdkClose
+[00041.745] 11805:11818> [ERROR:garnet/bin/ui/root_presenter/app.cc(214)] Session died, destroying all presentations.
+[00041.770] 05385:05399> [ERROR:garnet/bin/sysmgr/app.cc(185)] Singleton fuchsia-pkg://fuchsia.com/scenic#meta/scenic.cmx died
+[00046.293] 12740:13732> [INFO:component.cc(247)] Using snapshot without framework for fuchsia-pkg://fuchsia.com/userpicker_base_shell#meta/userpicker_base_shell.cmx
+[00048.335] 12740:13732> [INFO:vulkan_application.cc(116)] Debug reporting is enabled.
+[00048.350] 12740:13732> [ERROR:third_party/flutter/vulkan/vulkan_debug_report.cc(170)]
+[00048.350] 12740:13732> --- Vulkan Debug Report  ----------------------------------------
+[00048.350] 12740:13732> |       Severity: Error
+[00048.350] 12740:13732> |    Object Type: Instance
+[00048.350] 12740:13732> |  Object Handle: 24629992116240
+[00048.350] 12740:13732> |          Layer: Loader Message
+[00048.355] 12740:13732> |        Message: setupLoaderTermPhysDevs:  Failed to detect any valid GPUs in the current config
+[00048.355] 12740:13732> -----------------------------------------------------------------
+[00048.356] 12740:13732> ERROR: setupLoaderTermPhysDevs:  Failed to detect any valid GPUs in the current config
+[00048.357] 12740:13732> [ERROR:third_party/flutter/vulkan/vulkan_debug_report.cc(170)]
+[00048.357] 12740:13732> --- Vulkan Debug Report  ----------------------------------------
+[00048.357] 12740:13732> |       Severity: Error
+[00048.357] 12740:13732> |    Object Type: Instance
+[00048.357] 12740:13732> |  Object Handle: 24629992116240
+[00048.357] 12740:13732> |          Layer: Loader Message
+[00048.357] 12740:13732> |        Message: setupLoaderTrampPhysDevs:  Failed during dispatch call of 'vkEnumeratePhysicalDevices' to lower layers or loader to get count.
+[00048.357] 12740:13732> -----------------------------------------------------------------
+[00048.357] 12740:13732> ERROR: setupLoaderTrampPhysDevs:  Failed during dispatch call of 'vkEnumeratePhysicalDevices' to lower layers or loader to get count.
+[00048.358] 12740:13732> [INFO:vulkan_application.cc(148)] Vulkan call 'vk.EnumeratePhysicalDevices(instance_, &device_count, nullptr)' failed with error VK_ERROR_INITIALIZATION_FAILED
+[00048.358] 12740:13732> [INFO:vulkan_application.cc(149)] Could not enumerate physical device.
+[00048.358] 12740:13732> [INFO:vulkan_application.cc(180)] Could not acquire compatible logical device.
+[00048.358] 12740:13732> [ERROR:topaz/runtime/flutter_runner/vulkan_surface_producer.cc(85)] Device proc addresses have not been setup.
+[00048.359] 12740:13732> [ERROR:topaz/runtime/flutter_runner/vulkan_surface_producer.cc(46)] Flutter engine: Vulkan surface producer initialization: Failed
+[00049.166] 12740:13732> [INFO:dart_vm.cc(270)] Attempting Dart VM launch for mode: Interpreter
+[00049.241] 12740:13732> [INFO:dart_vm.cc(424)] New Dart VM instance created. Instance count: 1
+[00049.263] 12740:13732> [WARNING:third_party/flutter/shell/common/shell.cc(202)] Skipping ICU initialization in the shell.
+[00049.586] 14025:14037> [INFO:a11y_input_system.cc(11)] Scenic accessibility input system started.
+[00049.643] 14025:14037> [INFO:display_watcher.cc(40)] Scenic: Acquired display controller /dev/class/display-controller/000.(000)
+[00049.653] 03311:03325> GetSysmemConnection failed (continuing) - status: -2
+[00050.844] 14025:14037> ERROR: setupLoaderTermPhysDevs:  Failed to detect any valid GPUs in the current config
+[00050.844] 14025:14037> ERROR: setupLoaderTrampPhysDevs:  Failed during dispatch call of 'vkEnumeratePhysicalDevices' to lower layers or loader to get count.
+[00050.861] 14025:14037> [ERROR:garnet/lib/ui/gfx/gfx_system.cc(195)] No Vulkan on device, Graphics system exiting.
+[00050.879] 14025:14037> [INFO:input_system.cc(203)] Scenic input system initialized.
+[00050.896] 03311:03325> DdkClose
+[00051.040] 05385:05399> [ERROR:garnet/bin/sysmgr/app.cc(185)] Singleton fuchsia-pkg://fuchsia.com/scenic#meta/scenic.cmx died
+[00051.283] 12740:14388> userpicker_base_shell.cmx(flutter): Observatory listening on http://127.0.0.1:56648/
+[00051.352] 12740:14388> userpicker_base_shell.cmx(flutter): Creating /tmp/dart.services/56648
+[00054.365] 04851:04865> [ERROR:garnet/bin/appmgr/service_provider_dir_impl.cc(101)] Cannot serve service fuchsia.modular.Clipboard for component fuchsia-pkg://fuchsia.com/userpicker_base_shell#meta/userpicker_base_shell.cmx: ZX_ERR_NOT_FOUND
+[00054.378] 12740:13792> [WARNING:third_party/flutter/shell/common/platform_view.cc(84)] This platform does not setup the resource context on the IO thread for async texture uploads.
+[00054.592] 12740:13732> [WARNING:third_party/flutter/shell/common/persistent_cache.cc(69)] Could not acquire the persistent cache directory. Caching of GPU resources on disk is disabled.
+[00054.617] 12740:13792> [WARNING:third_party/flutter/shell/common/platform_view.cc(84)] This platform does not setup the resource context on the IO thread for async texture uploads.
+[00054.684] 12740:13732> [ERROR:topaz/runtime/flutter_runner/platform_view.cc(76)] Interface error on: SessionListener
+[00054.699] 12740:13732> [ERROR:topaz/runtime/flutter_runner/platform_view.cc(70)] Interface error on: Clipboard
+[00056.507] 04851:04865> [INFO:namespace_builder.cc(44)] config-data for fonts
+[00060.304] 12740:13785> [INFO:dart_isolate.cc(496)] New isolate is in the running state.
+[00060.328] 12740:13785> [INFO:engine.cc(374)] Main isolate for engine 'userpicker_base_shell.cmx' was started.
+[00062.245] 12740:13785> [INFO:paragraph.cc(293)] Could not find font collection for families "".
+[00071.514] 12740:13778> [INFO:vulkan_application.cc(105)] Destroying Vulkan instance

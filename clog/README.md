@@ -1,0 +1,1 @@
+An utility to output colored log.

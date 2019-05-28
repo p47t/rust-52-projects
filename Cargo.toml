@@ -6,4 +6,5 @@ members = [
   "shell",
   "ebml",
   "game-server",
+  "clog",
 ]
