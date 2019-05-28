@@ -54,9 +54,9 @@ fn main() -> Result<(), NoneError> {
     let style_sheet = StyleSheet::new(vec![
         (".text", "white"),
         (".time", "cyan"),
-        (".source", "green"),
+        (".source", "bright green"),
         (".thread", "cyan"),
-        (".info", "white"),
+        (".info", "bright white"),
         (".warning", "magenta"),
         (".error", "red"),
     ]);
