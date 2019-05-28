@@ -20,7 +20,7 @@ lazy_static! {
             r"\[(?P<time0>\d{5}\.\d{3})]\s+",
             r"(?P<time1>\d{5}:\d{5})>\s*",
             r"(?P<content>",
-                r"(((?P<tag>[A-Z]+):\s+)?((?P<source>[a-zA-Z0-9_]+):\s+)?)?",
+                r"(((?P<tag>[A-Z]+):\s+)?((?P<source>[a-zA-Z0-9_\.\(\)]+):\s+)?)?",
                 r"(?P<text>.*)",
             r")?",
         )
