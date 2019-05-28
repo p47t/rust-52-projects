@@ -66,11 +66,16 @@ fn main() -> Result<(), NoneError> {
         if n == 0 {
             break;
         }
-        if let Ok(fields) = crate::fuchsia::parse_line(&line) {
-            for field in fields {
-                print!("{}", field.format(&style_sheet)?);
+        match crate::fuchsia::parse_line(&line) {
+            Ok(fields) => {
+                for field in fields {
+                    print!("{}", field.format(&style_sheet)?);
+                }
+                print!("\n");
             }
-            print!("\n");
+            Err(..) => {
+                print!("{}", line); // print as it is
+            }
         }
         line.clear();
     }
