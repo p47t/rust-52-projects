@@ -3,11 +3,11 @@ This is a AWS Lambda function in Rust for an Alexa Skill.
 ### Usage
 
 - Build it with x86_64-unknown-linux-musl toolchain:
-  - `cargo build --release --target x86_64-unknown-linux-musl`
+  - $ **cargo build --release --target x86_64-unknown-linux-musl**
 - Create deployment package:
   - $ **cp ../target/x86_64-unknown-linux-musl/release/programming-wisdom ./bootstrap && zip lambda.zip bootstrap && rm bootstrap**
 - Create the Lambda function with AWS `awscli`:
-  - $ **aws lambda create-function --function-name programmingWisdom --handler doesnt.matter --runtime provided --role** _your_role_ **--zip-file fileb://./lambda.zip**
+  - $ **aws lambda create-function --function-name programmingWisdom --handler doesnt.matter --runtime provided --role** _your_aws_role_ **--zip-file fileb://./lambda.zip**
 - Invoke the function:
   - **aws lambda invoke --function-name programmingWisdom output.json**
 
