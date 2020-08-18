@@ -1,5 +1,6 @@
 use std::thread;
 use std::sync::{mpsc, Mutex, Arc};
+use std::thread::JoinHandle;
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
@@ -16,7 +17,7 @@ impl<F: FnOnce()> FnBox for F {
     }
 }
 
-type Job = Box<FnBox + Send + 'static>;
+type Job = Box<dyn FnBox + Send + 'static>;
 
 enum Message {
     NewJob(Job),
@@ -31,7 +32,7 @@ struct Worker {
 
 impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
-        let thread = thread::spawn(move || {
+        let thread: JoinHandle<()> = thread::spawn(move || {
             loop {
                 // NOTE: understand why these operation may fail
                 let message = receiver.lock().unwrap().recv().unwrap();
