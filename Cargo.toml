@@ -8,6 +8,7 @@ members = [
   "game-server",
   "clog",
   "web-server",
+  "programming-wisdom",
   "hyper-app",
   "plum",
 ]
