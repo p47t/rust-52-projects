@@ -40,14 +40,14 @@ impl<T: ?Sized> StandardBloomFilter<T> {
     }
 
     pub fn insert(&mut self, item: &T) where T: Hash {
-        let (h1, h2) = self.hask_kernel(item);
+        let (h1, h2) = self.hash_kernel(item);
         for k_i in 0..self.optimal_k {
             let index = self.get_index(h1, h2, k_i as u64);
             self.bitmap.set(index, true);
         }
     }
 
-    fn hask_kernel(&self, item: &T) -> (u64, u64) where T: Hash {
+    fn hash_kernel(&self, item: &T) -> (u64, u64) where T: Hash {
         let hasher1 = &mut self.hashers[0].clone();
         let hasher2 = &mut self.hashers[1].clone();
         item.hash(hasher1);
@@ -61,7 +61,7 @@ impl<T: ?Sized> StandardBloomFilter<T> {
     }
 
     pub fn contains(&self, item: &T) -> bool where T: Hash {
-        let (h1, h2) = self.hask_kernel(item);
+        let (h1, h2) = self.hash_kernel(item);
         for k_i in 0..self.optimal_k {
             let index = self.get_index(h1, h2, k_i as u64);
             if !self.bitmap.get(index).unwrap() {
