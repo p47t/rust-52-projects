@@ -11,4 +11,5 @@ members = [
   "programming-wisdom",
   "hyper-app",
   "plum",
+  "file_transfer",
 ]
