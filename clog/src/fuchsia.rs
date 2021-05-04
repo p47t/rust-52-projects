@@ -1,6 +1,6 @@
-use anyhow::anyhow;
 use regex::Regex;
 use lazy_static::lazy_static;
+use thiserror::Error;
 
 use crate::Field;
 
@@ -36,26 +36,46 @@ fn tag_to_class(t: &str) -> Option<&'static str> {
     }
 }
 
-pub fn parse_line(line: &str) -> Result<Vec<Field>, anyhow::Error> {
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("unmatched line")]
+    Unmatched,
+    #[error("missing field")]
+    MissingField
+}
+
+/// To get a named field
+trait FieldStr<'t> {
+    fn field(&self, name: &str) -> Result<&'t str, ParseError>;
+}
+
+/// Extend Captures to get named field with Result
+impl<'t> FieldStr<'t> for regex::Captures<'t> {
+    fn field(&self, name: &str) -> Result<&'t str, ParseError> {
+        Ok(self.name(name).ok_or(ParseError::MissingField)?.as_str())
+    }
+}
+
+pub fn parse_line(line: &str) -> Result<Vec<Field>, ParseError> {
     if let Some(cap) = RE_LOG.captures(line) {
-        match tag_to_class(cap.name("tag").unwrap().as_str()) {
+        match tag_to_class(cap.field("tag")?) {
             Some(class) => Ok(vec![
-                Field::new("[", ".time", cap.name("time0").unwrap().as_str(), "]"),
-                Field::new(" ", ".time", cap.name("time1").unwrap().as_str(), ">"),
-                Field::new(" [", class, cap.name("tag").unwrap().as_str(), ":"),
-                Field::pos(".source", cap.name("source").unwrap().as_str(), "]"),
-                Field::pre(" ", class, cap.name("text").unwrap().as_str()),
+                Field::new("[", ".time", cap.field("time0")?, "]"),
+                Field::new(" ", ".time", cap.field("time1")?, ">"),
+                Field::new(" [", class, cap.field("tag")?, ":"),
+                Field::pos(".source", cap.field("source")?, "]"),
+                Field::pre(" ", class, cap.field("text")?),
             ]),
-            _ => Err(anyhow!("class not found")),
+            _ => Err(ParseError::Unmatched),
         }
     } else if let Some(cap) = RE_KERNEL_LOG.captures(line) {
         let mut ret = vec![
-            Field::new("[", ".time", cap.name("time0").unwrap().as_str(), "]"),
-            Field::new(" ", ".time", cap.name("time1").unwrap().as_str(), ">"),
+            Field::new("[", ".time", cap.field("time0")?, "]"),
+            Field::new(" ", ".time", cap.field("time1")?, ">"),
         ];
         if let Some(_) = cap.name("content") {
             if let Some(_) = cap.name("tag") {
-                let tag = cap.name("tag").unwrap().as_str();
+                let tag = cap.field("tag")?;
                 if let Some(class) = tag_to_class(tag) {
                     ret.extend(vec![
                         Field::new(" ", class, tag, ":"),
@@ -68,26 +88,26 @@ pub fn parse_line(line: &str) -> Result<Vec<Field>, anyhow::Error> {
                 }
                 if let Some(_) = cap.name("source") {
                     ret.extend(vec![
-                        Field::new(" ", ".source", cap.name("source").unwrap().as_str(), ":"),
+                        Field::new(" ", ".source", cap.field("source")?, ":"),
                     ]);
                 }
                 if let Some(class) = tag_to_class(tag) {
                     ret.extend(vec![
-                        Field::pre(" ", class, cap.name("text").unwrap().as_str()),
+                        Field::pre(" ", class, cap.field("text")?),
                     ]);
                 } else {
                     ret.extend(vec![
-                        Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
+                        Field::pre(" ", ".text", cap.field("text")?),
                     ]);
                 }
             } else if let Some(_) = cap.name("source") {
                 ret.extend(vec![
-                    Field::new(" ", ".source", cap.name("source").unwrap().as_str(), ":"),
-                    Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
+                    Field::new(" ", ".source", cap.field("source")?, ":"),
+                    Field::pre(" ", ".text", cap.field("text")?),
                 ]);
             } else {
                 ret.extend(vec![
-                    Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
+                    Field::pre(" ", ".text", cap.field("text")?),
                 ]);
             }
         }
