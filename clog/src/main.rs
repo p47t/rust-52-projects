@@ -1,7 +1,5 @@
-#![feature(try_trait)]
-
+use anyhow::anyhow;
 use std::collections::HashMap;
-use std::option::NoneError;
 
 use colored::*;
 
@@ -16,8 +14,11 @@ impl<'a> StyleSheet<'a> {
         StyleSheet { inner: init.iter().cloned().collect() }
     }
 
-    fn get(&self, class: &str) -> Result<&str, NoneError> {
-        Ok(*self.inner.get(class)?)
+    fn get(&self, class: &str) -> Result<&str, anyhow::Error> {
+        match self.inner.get(class) {
+            Some(&color) => Ok(color),
+            _ => Err(anyhow!("class not found"))
+        }
     }
 }
 
@@ -42,7 +43,7 @@ impl<'a> Field<'a> {
         Field { prefix, class, content, postfix: "" }
     }
 
-    fn format(&self, style_sheet: &StyleSheet) -> Result<String, NoneError> {
+    fn format(&self, style_sheet: &StyleSheet) -> Result<String, anyhow::Error> {
         Ok(format!("{}{}{}",
                    self.prefix.color(style_sheet.get(".text")?),
                    self.content.color(style_sheet.get(self.class)?),
@@ -50,7 +51,7 @@ impl<'a> Field<'a> {
     }
 }
 
-fn main() -> Result<(), NoneError> {
+fn main() -> Result<(), anyhow::Error> {
     let style_sheet = StyleSheet::new(vec![
         (".text", "white"),
         (".time", "cyan"),

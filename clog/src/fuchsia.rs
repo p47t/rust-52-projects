@@ -1,5 +1,5 @@
+use anyhow::anyhow;
 use regex::Regex;
-
 use lazy_static::lazy_static;
 
 use crate::Field;
@@ -36,24 +36,26 @@ fn tag_to_class(t: &str) -> Option<&'static str> {
     }
 }
 
-pub fn parse_line(line: &str) -> Result<Vec<Field>, std::option::NoneError> {
+pub fn parse_line(line: &str) -> Result<Vec<Field>, anyhow::Error> {
     if let Some(cap) = RE_LOG.captures(line) {
-        let class = tag_to_class(cap.name("tag")?.as_str())?;
-        Ok(vec![
-            Field::new("[", ".time", cap.name("time0")?.as_str(), "]"),
-            Field::new(" ", ".time", cap.name("time1")?.as_str(), ">"),
-            Field::new(" [", class, cap.name("tag")?.as_str(), ":"),
-            Field::pos(".source", cap.name("source")?.as_str(), "]"),
-            Field::pre(" ", class, cap.name("text")?.as_str()),
-        ])
+        match tag_to_class(cap.name("tag").unwrap().as_str()) {
+            Some(class) => Ok(vec![
+                Field::new("[", ".time", cap.name("time0").unwrap().as_str(), "]"),
+                Field::new(" ", ".time", cap.name("time1").unwrap().as_str(), ">"),
+                Field::new(" [", class, cap.name("tag").unwrap().as_str(), ":"),
+                Field::pos(".source", cap.name("source").unwrap().as_str(), "]"),
+                Field::pre(" ", class, cap.name("text").unwrap().as_str()),
+            ]),
+            _ => Err(anyhow!("class not found")),
+        }
     } else if let Some(cap) = RE_KERNEL_LOG.captures(line) {
         let mut ret = vec![
-            Field::new("[", ".time", cap.name("time0")?.as_str(), "]"),
-            Field::new(" ", ".time", cap.name("time1")?.as_str(), ">"),
+            Field::new("[", ".time", cap.name("time0").unwrap().as_str(), "]"),
+            Field::new(" ", ".time", cap.name("time1").unwrap().as_str(), ">"),
         ];
         if let Some(_) = cap.name("content") {
             if let Some(_) = cap.name("tag") {
-                let tag = cap.name("tag")?.as_str();
+                let tag = cap.name("tag").unwrap().as_str();
                 if let Some(class) = tag_to_class(tag) {
                     ret.extend(vec![
                         Field::new(" ", class, tag, ":"),
@@ -66,26 +68,26 @@ pub fn parse_line(line: &str) -> Result<Vec<Field>, std::option::NoneError> {
                 }
                 if let Some(_) = cap.name("source") {
                     ret.extend(vec![
-                        Field::new(" ", ".source", cap.name("source")?.as_str(), ":"),
+                        Field::new(" ", ".source", cap.name("source").unwrap().as_str(), ":"),
                     ]);
                 }
                 if let Some(class) = tag_to_class(tag) {
                     ret.extend(vec![
-                        Field::pre(" ", class, cap.name("text")?.as_str()),
+                        Field::pre(" ", class, cap.name("text").unwrap().as_str()),
                     ]);
                 } else {
                     ret.extend(vec![
-                        Field::pre(" ", ".text", cap.name("text")?.as_str()),
+                        Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
                     ]);
                 }
             } else if let Some(_) = cap.name("source") {
                 ret.extend(vec![
-                    Field::new(" ", ".source", cap.name("source")?.as_str(), ":"),
-                    Field::pre(" ", ".text", cap.name("text")?.as_str()),
+                    Field::new(" ", ".source", cap.name("source").unwrap().as_str(), ":"),
+                    Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
                 ]);
             } else {
                 ret.extend(vec![
-                    Field::pre(" ", ".text", cap.name("text")?.as_str()),
+                    Field::pre(" ", ".text", cap.name("text").unwrap().as_str()),
                 ]);
             }
         }

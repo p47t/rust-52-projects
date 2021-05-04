@@ -1,5 +1,5 @@
 [package]
-name = "clog"
+name = "count-words"
 version = "0.1.0"
 authors = ["Patrick Tsai <patrick@simplypatrick.com>"]
 edition = "2018"
@@ -7,8 +7,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "2.33.0"
-colored = "1.8.0"
-regex = "1.1.6"
-lazy_static = "1.3.0"
-anyhow = "1.0.38"
+thiserror = "1.0.24"
+anyhow = "1.0.40"
