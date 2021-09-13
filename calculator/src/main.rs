@@ -15,16 +15,21 @@ enum Token {
 
 struct Calculator<TS> {
     token_stream: TS,
-    current_token: Option<Token>,
     symbols: HashMap<String, f64>,
+
+    current_token: Option<Token>,
 }
 
 impl<TS> Calculator<TS> {
     fn new(token_stream: TS) -> Calculator<TS> {
+        let mut symbols = HashMap::new();
+        symbols.insert("pi".to_owned(), std::f64::consts::PI);
+        symbols.insert("e".to_owned(), std::f64::consts::E);
+
         Calculator {
             token_stream,
             current_token: None,
-            symbols: Default::default(),
+            symbols,
         }
     }
 }
@@ -38,19 +43,22 @@ impl<TS: Iterator<Item=Token>> Calculator<TS> {
     //      expression print
     //      expression print expr_list
     //
-    fn calculate(&mut self) {
+    fn calculate(&mut self) -> Vec<String> {
+        let mut result = vec![];
         loop {
             match self.token_stream.next() {
                 None => break,
                 Some(Token::Print) => continue,
                 token => {
-                    match self.expr(token) {
-                        Ok(value) => println!("{}", value),
-                        Err(msg) => println!("{}", msg),
-                    }
+                    let line = match self.expr(token) {
+                        Ok(value) => value.to_string(),
+                        Err(msg) => msg.to_string(),
+                    };
+                    result.push(line)
                 }
             }
         }
+        result
     }
 
     // expression:
@@ -89,9 +97,6 @@ impl<TS: Iterator<Item=Token>> Calculator<TS> {
                 }
                 Some(Token::Div) => {
                     let p = self.prim(None)?;
-                    if p == 0.0f64 {
-                        return Err("divide by error".to_string());
-                    }
                     left /= p;
                 }
                 _ => {
@@ -130,10 +135,10 @@ impl<TS: Iterator<Item=Token>> Calculator<TS> {
                     self.current_token = self.token_stream.next();
                     Ok(e)
                 } else {
-                    Err("unmatched parenthesis".to_string())
+                    Err("unmatched parenthesis".to_owned())
                 }
             }
-            _ => Err("primary expected".to_string()),
+            _ => Err("primary expected".to_owned()),
         }
     }
 }
@@ -175,16 +180,9 @@ impl Iterator for TokenStream {
                 ')' => return Some(Token::RP),
                 '=' => return Some(Token::Assign),
                 '0'..='9' | '.' => {
-                    loop {
-                        if self.offset >= self.input.len() {
-                            break;
-                        }
-                        let c = self.input[self.offset];
-                        if !c.is_digit(10) && c != '.' {
-                            break;
-                        }
-                        self.offset += 1;
-                    }
+                    self.offset += self.input[self.offset..].iter()
+                        .position(|c| !c.is_digit(10) && *c != '.')
+                        .unwrap_or(0);
                     let number: String = self.input[begin..self.offset].iter().collect();
                     return if let Ok(number) = number.parse::<f64>() {
                         Some(Token::Number(number))
@@ -193,16 +191,9 @@ impl Iterator for TokenStream {
                     };
                 }
                 x if x.is_alphabetic() => {
-                    loop {
-                        if self.offset >= self.input.len() {
-                            break;
-                        }
-                        let c = self.input[self.offset];
-                        if !c.is_alphabetic() && c != '_' {
-                            break;
-                        }
-                        self.offset += 1;
-                    }
+                    self.offset += self.input[self.offset..].iter()
+                        .position(|c| !c.is_alphabetic() && *c != '_')
+                        .unwrap_or(0);
                     let name = self.input[begin..self.offset].iter().collect();
                     return Some(Token::Name(name));
                 }
@@ -222,14 +213,14 @@ mod tests {
         let mut calc = Calculator::new(
             // x = 1; y = (x + 2*3/2 - 1); x + y
             vec![
-                Token::Name("x".to_string()),
+                Token::Name("x".to_owned()),
                 Token::Assign,
                 Token::Number(1.0f64),
                 Token::Print,
-                Token::Name("y".to_string()),
+                Token::Name("y".to_owned()),
                 Token::Assign,
                 Token::LP,
-                Token::Name("x".to_string()),
+                Token::Name("x".to_owned()),
                 Token::Plus,
                 Token::Number(2.0f64),
                 Token::Mul,
@@ -240,19 +231,37 @@ mod tests {
                 Token::Number(1.0f64),
                 Token::RP,
                 Token::Print,
-                Token::Name("x".to_string()),
+                Token::Name("x".to_owned()),
                 Token::Plus,
-                Token::Name("y".to_string()),
+                Token::Name("y".to_owned()),
             ].into_iter(),
         );
-        calc.calculate();
+        let lines = calc.calculate();
+        assert_eq!(lines, vec!["1", "3", "4"]);
     }
 
     #[test]
     fn test_program_1() {
         let mut calc = Calculator::new(
             TokenStream::new("x = 1; y = (x + 2*3/2 - 1); z = 0.5; x + y * z"));
-        calc.calculate();
+        let lines = calc.calculate();
+        assert_eq!(lines, vec!["1", "3", "0.5", "2.5"]);
+    }
+
+    #[test]
+    fn test_program_2() {
+        let mut calc = Calculator::new(
+            TokenStream::new("r = 10; a = pi * r * r"));
+        let lines = calc.calculate();
+        assert_eq!(lines, vec!["10", "314.1592653589793"]);
+    }
+
+    #[test]
+    fn test_program_3() {
+        let mut calc = Calculator::new(
+            TokenStream::new("1/0"));
+        let lines = calc.calculate();
+        assert_eq!(lines, vec!["inf"]);
     }
 }
 
@@ -260,6 +269,8 @@ fn main() {
     for p in std::env::args().skip(1) {
         println!("Calculating {}", p);
         let mut calc = Calculator::new(TokenStream::new(&p));
-        calc.calculate();
+        for line in calc.calculate() {
+            println!("{}", line);
+        }
     }
 }
