@@ -12,5 +12,6 @@ members = [
   "hyper-app",
   "plum",
   "file-transfer",
-  "count-words"
+  "count-words",
+  "calculator",
 ]
