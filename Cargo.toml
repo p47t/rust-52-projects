@@ -14,4 +14,6 @@ members = [
   "file-transfer",
   "count-words",
   "calculator",
+  "socks5",
+  "small-os",
 ]
