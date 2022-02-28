@@ -15,5 +15,4 @@ members = [
   "count-words",
   "calculator",
   "socks5",
-  "small-os",
 ]
