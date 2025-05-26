@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
-
 use bytes::{Buf, BufMut, BytesMut};
 
 const BLOCK_SIZE: usize = 512;
@@ -65,7 +64,7 @@ pub enum Packet {
 impl Packet {
     pub fn from(payload: &[u8]) -> Option<Packet> {
         let mut cursor = Cursor::new(payload);
-        match OpCode::from(cursor.get_u16_be()) {
+        match OpCode::from(cursor.get_u16()) {
             OpCode::Rrq => Some(Packet::ReadRequest {
                 filename: read_cstr(&mut cursor),
                 mode: read_cstr(&mut cursor),
@@ -75,7 +74,7 @@ impl Packet {
                 mode: read_cstr(&mut cursor),
             }),
             OpCode::Data => Some(Packet::Data {
-                block_num: cursor.get_u16_be(),
+                block_num: cursor.get_u16(),
                 data: {
                     let mut vec = Vec::<u8>::new();
                     let _ = cursor.read_to_end(&mut vec);
@@ -83,10 +82,10 @@ impl Packet {
                 },
             }),
             OpCode::Ack => Some(Packet::Ack {
-                block_num: cursor.get_u16_be(),
+                block_num: cursor.get_u16(),
             }),
             OpCode::Error => Some(Packet::Error {
-                error_code: cursor.get_u16_be(),
+                error_code: cursor.get_u16(),
                 error_msg: read_cstr(&mut cursor),
             }),
             _ => None
@@ -98,37 +97,37 @@ impl Packet {
         match self {
             Packet::ReadRequest { filename, mode } => {
                 buf = BytesMut::with_capacity(128);
-                buf.put_u16_be(OpCode::Rrq as u16);
-                filename.bytes().for_each(|b| buf.put(b));
-                buf.put(0u8);
-                mode.bytes().for_each(|b| buf.put(b));
-                buf.put(0u8);
+                buf.put_u16(OpCode::Rrq as u16);
+                filename.bytes().for_each(|b| buf.put_u8(b));
+                buf.put_u8(0u8);
+                mode.bytes().for_each(|b| buf.put_u8(b));
+                buf.put_u8(0u8);
             }
             Packet::WriteRequest { filename, mode } => {
                 buf = BytesMut::with_capacity(128);
-                buf.put_u16_be(OpCode::Wrq as u16);
-                filename.bytes().for_each(|b| buf.put(b));
-                buf.put(0u8);
-                mode.bytes().for_each(|b| buf.put(b));
-                buf.put(0u8);
+                buf.put_u16(OpCode::Wrq as u16);
+                filename.bytes().for_each(|b| buf.put_u8(b));
+                buf.put_u8(0u8);
+                mode.bytes().for_each(|b| buf.put_u8(b));
+                buf.put_u8(0u8);
             }
             Packet::Data { block_num, data } => {
                 buf = BytesMut::with_capacity(4);
-                buf.put_u16_be(OpCode::Data as u16);
-                buf.put_u16_be(*block_num);
+                buf.put_u16(OpCode::Data as u16);
+                buf.put_u16(*block_num);
                 buf.extend_from_slice(data);
             }
             Packet::Ack { block_num } => {
                 buf = BytesMut::with_capacity(4);
-                buf.put_u16_be(OpCode::Ack as u16);
-                buf.put_u16_be(*block_num);
+                buf.put_u16(OpCode::Ack as u16);
+                buf.put_u16(*block_num);
             }
             Packet::Error { error_code, error_msg } => {
                 buf = BytesMut::with_capacity(128);
-                buf.put_u16_be(OpCode::Error as u16);
-                buf.put_u16_be(*error_code);
-                error_msg.bytes().for_each(|b| buf.put(b));
-                buf.put(0u8);
+                buf.put_u16(OpCode::Error as u16);
+                buf.put_u16(*error_code);
+                error_msg.bytes().for_each(|b| buf.put_u8(b));
+                buf.put_u8(0u8);
             }
         }
         buf.freeze().to_vec()

@@ -1,11 +1,17 @@
-#[macro_use]
-extern crate nom;
-
 use std::io::Error;
 use std::process::{Child, Stdio};
 use std::str::from_utf8;
 
-use rustyline::Editor;
+use nom::{
+    branch::alt,
+    bytes::complete::{is_a, is_not, tag, take_until},
+    character::complete::space0,
+    combinator::map,
+    multi::many1,
+    sequence::{delimited, tuple},
+    IResult,
+};
+use rustyline::{Editor, Result as RustylineResult};
 
 trait Executable {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error>;
@@ -45,37 +51,46 @@ impl Executable for Pipeline {
     }
 }
 
-named!(pipe, is_a!("|"));
-named!(unquoted_arg, is_not!(" \t\r\n'|"));
-named!(single_quoted_arg, delimited!(tag!("'"), take_until!("'"), tag!("'")));
-named!(arg, delimited!(nom::space0, alt!(unquoted_arg | single_quoted_arg), nom::space0));
+// Parser functions
+fn pipe(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    is_a("|")(input)
+}
 
-named!(command<Command>,
-    do_parse!(
-        args: many1!(arg) >>
-        ({
-            let args: Vec<&str> = args.iter().map(|bytes| from_utf8(bytes).unwrap()).collect();
-            Command {
-                program: args.first().unwrap().to_string(),
-                args: args[1..].iter().map(|str| str.to_string()).collect(),
-            }
-        })
-    )
-);
+fn unquoted_arg(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    is_not(" \t\r\n'|")(input)
+}
 
-named!(cmdline<Box<dyn Executable>>, alt!(
-    pipeline |
-    command => {|c| Box::new(c) as Box<dyn Executable>}
-));
+fn single_quoted_arg(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    delimited(tag("'"), take_until("'"), tag("'"))(input)
+}
 
-named!(pipeline<Box<dyn Executable>>,
-    do_parse!(
-        left: command >>
-        pipe >>
-        right: cmdline >>
-        (Box::new(Pipeline{left, right}) as Box<dyn Executable>)
-    )
-);
+fn arg(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    delimited(space0, alt((unquoted_arg, single_quoted_arg)), space0)(input)
+}
+
+fn command(input: &[u8]) -> IResult<&[u8], Command> {
+    map(many1(arg), |args| {
+        let args: Vec<&str> = args.iter().map(|bytes| from_utf8(bytes).unwrap()).collect();
+        Command {
+            program: args.first().unwrap().to_string(),
+            args: args[1..].iter().map(|str| str.to_string()).collect(),
+        }
+    })(input)
+}
+
+fn pipeline(input: &[u8]) -> IResult<&[u8], Box<dyn Executable>> {
+    map(
+        tuple((command, pipe, cmdline)),
+        |(left, _, right)| Box::new(Pipeline { left, right }) as Box<dyn Executable>
+    )(input)
+}
+
+fn cmdline(input: &[u8]) -> IResult<&[u8], Box<dyn Executable>> {
+    alt((
+        pipeline,
+        map(command, |c| Box::new(c) as Box<dyn Executable>)
+    ))(input)
+}
 
 fn parse_and_execute(line: &str) {
     if line.trim().is_empty() {
@@ -96,10 +111,11 @@ fn parse_and_execute(line: &str) {
     }
 }
 
-fn main() {
-    let mut rl = Editor::<()>::new();
+fn main() -> RustylineResult<()> {
+    let mut rl = Editor::<()>::new()?;
     loop {
-        if let Ok(line) = rl.readline("> ") {
+        let readline = rl.readline("> ");
+        if let Ok(line) = readline {
             parse_and_execute(&line);
         }
     }

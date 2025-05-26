@@ -1,11 +1,14 @@
-use lambda_runtime::{error::HandlerError, lambda, Context};
-use std::error::Error;
+use lambda_runtime::{service_fn, Error, LambdaEvent};
+use serde_json::Value;
 
 mod alexa;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    lambda!(my_handler);
-    Ok(())
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    simple_logger::init_with_level(log::Level::Info)
+        .map_err(|e| Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>))?;
+
+    lambda_runtime::run(service_fn(my_handler)).await
 }
 
 fn build_quote_response(quote: &str, author: &str) -> alexa::ResponseRoot {
@@ -15,7 +18,7 @@ fn build_quote_response(quote: &str, author: &str) -> alexa::ResponseRoot {
         response: alexa::Response {
             output_speech: Some(alexa::OutputSpeech {
                 r#type: "PlainText".to_string(),
-                text: Some(author.to_string() + " said " + quote),
+                text: Some(format!("{} said {}", author, quote)),
                 ssml: None,
                 play_behavior: None,
             }),
@@ -27,7 +30,9 @@ fn build_quote_response(quote: &str, author: &str) -> alexa::ResponseRoot {
     }
 }
 
-fn my_handler(_e: alexa::RequestRoot, _ctx: Context) -> Result<alexa::ResponseRoot, HandlerError> {
+async fn my_handler(event: LambdaEvent<alexa::RequestRoot>) -> Result<alexa::ResponseRoot, Error> {
+    let (_event, _context) = event.into_parts();
+
     Ok(build_quote_response(
         "The best way to predict the future is to invent it.",
         "Alan Kay"))

@@ -1,4 +1,6 @@
+#[cfg(test)]
 use strum::IntoEnumIterator;
+
 #[derive(Debug, Clone, Copy, strum_macros::EnumIter)]
 enum ResponseCode {
     Success = 0x00,
@@ -12,6 +14,7 @@ enum ResponseCode {
     AddrTypeNotSupported = 0x08,
 }
 
+#[cfg(test)]
 struct SocksReply {
     // The SOCKS request information is sent by the client as soon as it has
     // established a connection to the SOCKS server, and completed the
@@ -49,6 +52,7 @@ struct SocksReply {
     buf: [u8; 10],
 }
 
+#[cfg(test)]
 impl SocksReply {
     fn new(status: ResponseCode) -> Self {
         let buf =  [
@@ -67,6 +71,7 @@ impl SocksReply {
     }
 }
 
+#[cfg(test)]
 #[test]
 fn test_socks_reply() {
     for rc in ResponseCode::iter() {

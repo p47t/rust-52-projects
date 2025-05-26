@@ -28,7 +28,7 @@ impl RollResult {
 
 impl Distribution<RollResult> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RollResult {
-        RollResult::from(rng.gen_range(1, 7))
+        RollResult::from(rng.gen_range(1..7))
     }
 }
 
