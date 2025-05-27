@@ -1,150 +1,108 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::Arc, // Using std Arc, but with tokio::sync::Mutex
+};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::{Mutex, mpsc}, // Tokio's Mutex and MPSC
+};
+use tokio_tungstenite::{
+    accept_async,
+    tungstenite::{Error as TungsteniteError, Message as TungsteniteMessage},
+};
+use futures_util::{StreamExt, SinkExt}; // For .split(), .next(), .send()
+use rand::Rng; // For generating client IDs
 
-use failure::Error;
-use futures::{Future, Stream};
-use futures::future::Loop;
-use futures::sink::Sink;
-use websocket::OwnedMessage;
-use websocket::server::InvalidConnection;
-use websocket::server::r#async::Server;
-
-#[derive(Default)]
-pub struct Entity {
-    pub id: u32,
-    pub pos: (i32, i32),
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Client {
+    id: usize,
+    position_x: i32,
+    position_y: i32,
+    #[serde(skip)] // Avoid serializing the sender
+    // Sender for messages to be sent to this client's WebSocket stream
+    sender: Option<mpsc::UnboundedSender<Result<TungsteniteMessage, TungsteniteError>>>,
 }
 
-impl Entity {
-    pub fn to_json(&self) -> String {
-        format!("{{\"position\":{{\"x\":{},\"y\":{}}}, \"id\":{}}}", self.pos.0, self.pos.1, self.id)
-    }
+type GameState = Arc<Mutex<HashMap<usize, Client>>>;
 
-    fn process_message(&mut self, txt: &str) {
-        match txt {
-            "R" => { self.pos.0 += 10; }
-            "L" => { self.pos.0 -= 10; }
-            "D" => { self.pos.1 += 10; }
-            "U" => { self.pos.1 -= 10; }
-            _ => {}
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let server_addr = "127.0.0.1:9002";
+    let game_state = GameState::new(Mutex::new(HashMap::new()));
+
+    let listener = TcpListener::bind(&server_addr).await?;
+    println!("Game server listening on: {}", server_addr);
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                println!("New connection from: {}", addr);
+                let game_state_clone = game_state.clone();
+                tokio::spawn(async move { // Spawn an async block to handle connection
+                    if let Err(e) = handle_connection(game_state_clone, stream, addr).await {
+                        eprintln!("Connection handler for {} error: {:?}", addr, e);
+                    }
+                });
+            }
+            Err(e) => {
+                eprintln!("Failed to accept connection: {:?}", e);
+            }
         }
     }
+    // Ok(()) // main loop is infinite, so Ok(()) is unreachable
 }
 
-fn main() -> Result<(), Error> {
-    let server = Server::bind("127.0.0.1:8080", &tokio::reactor::Handle::default())?;
+// Updated handle_connection function for Part 2a
+async fn handle_connection(
+    state: GameState,
+    stream: TcpStream,
+    addr: SocketAddr,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let ws_stream = match accept_async(stream).await {
+        Ok(ws) => ws,
+        Err(e) => {
+            eprintln!("WebSocket handshake error for {}: {}", addr, e);
+            return Ok(()); // Connection closed due to handshake error
+        }
+    };
+    println!("WebSocket connection established: {}", addr);
 
-    let connections = Arc::new(RwLock::new(HashMap::new()));
-    let entities = Arc::new(RwLock::new(HashMap::new()));
-    let counter = Arc::new(RwLock::new(0));
+    // Ensure rand::Rng is in scope (e.g., `use rand::Rng;` at the top of the file)
+    let client_id: usize = rand::thread_rng().gen_range(1000..10000); 
 
-    let conn_handler = {
-        let connections = connections.clone();
-        let entities = entities.clone();
-        let counter = counter.clone();
-
-        server.incoming()
-            .map_err(|InvalidConnection { error, .. }| error)
-            .for_each(move |(upgrade, addr)| {
-                println!("client addr: {}", addr);
-
-                let accept = {
-                    let connections = connections.clone();
-                    let entities = entities.clone();
-                    let counter = counter.clone();
-
-                    upgrade.accept().and_then(move |(framed, _)| {
-                        let (sink, stream) = framed.split();
-
-                        // generate an ID for the client
-                        {
-                            let mut c = counter.write().unwrap();
-                            *c += 1;
-                        }
-                        let id = *counter.read().unwrap();
-                        println!("new client {}", id);
-
-                        // add id to Sink mapping
-                        connections.write().unwrap().insert(id, sink);
-                        // add id to Entity mapping
-                        entities.write().unwrap().insert(id, Entity { id, ..Default::default() });
-
-                        // spawn a task to handle message from this client
-                        let fut = stream.for_each(move |msg| {
-                            println!("message for client {}", id);
-                            process_message(id, &msg, entities.clone());
-                            Ok(())
-                        }).map_err(|_| ());
-                        tokio::spawn(fut);
-
-                        Ok(())
-                    }).map_err(|_| ())
-                };
-                tokio::spawn(accept);
-                Ok(())
-            }).map_err(|_| ())
+    // Create an MPSC channel for sending messages to this client
+    let (tx, _rx) = mpsc::unbounded_channel::<Result<TungsteniteMessage, TungsteniteError>>(); // _rx will be used in Part 2b
+    
+    let new_client = Client {
+        id: client_id,
+        position_x: 0, // Initial position
+        position_y: 0,
+        sender: Some(tx.clone()), // Store the sender
     };
 
-    let send_handler = {
-        let connections = connections.clone();
-        let entities = entities.clone();
+    state.lock().await.insert(client_id, new_client.clone());
+    println!("Client {} ({}) registered.", client_id, addr);
 
-        futures::future::loop_fn((), move |_| {
-            let connections = connections.clone();
-            let entities = entities.clone();
+    let (_ws_sender, _ws_receiver) = ws_stream.split(); // _ws_sender and _ws_receiver will be used in later parts
 
-            tokio::timer::Delay::new(Instant::now() + Duration::from_millis(100))
-                .map_err(|_| ())
-                .and_then(move |_| {
-                    println!("thread {:?}: broadcast game state", thread::current().id());
-                    let mut conn = connections.write().unwrap();
+    // TODO (Part 2b): Spawn task for sending messages (reading from _rx -> _ws_sender)
+    // TODO (Part 2c): Loop for receiving messages (reading from _ws_receiver)
+    
+    // For now, just keep the connection open until explicitly closed or error.
+    // A real implementation would await on send/receive tasks.
+    // We'll simulate keeping it alive by a placeholder if needed, or just let it drop for now.
+    // For this part, we are just testing registration.
+    // The function will return, and the connection will drop if nothing holds it.
+    // In later steps, loops will keep it alive.
 
-                    let ids = conn.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>();
-                    for id in ids.iter() {
-                        let sink = conn.remove(id).unwrap();
-                        let entities = entities.read().unwrap();
-
-                        // generate JSON for all entities
-                        let first = match entities.iter().take(1).next() {
-                            Some((_, e)) => e,
-                            None => return Ok(Loop::Continue(())),
-                        };
-                        let entities_json = format!("[{}]", entities.iter().skip(1)
-                            .map(|(_, e)| e.to_json())
-                            .fold(first.to_json(), |acc, s| format!("{},{}", s, acc)));
-
-                        // spawn a task to send the game state to the client
-                        let fut = {
-                            let connections = connections.clone();
-                            let id = id.clone();
-
-                            sink.send(OwnedMessage::Text(entities_json))
-                                .and_then(move |sink| {
-                                    // Re-insert the entry to the connections map
-                                    connections.write().unwrap().insert(id.clone(), sink);
-                                    Ok(())
-                                })
-                                .map_err(|_| ())
-                        };
-                        tokio::spawn(fut);
-                    }
-
-                    Ok(Loop::Continue(()))
-                })
-        })
-    };
-
-    tokio::runtime::current_thread::block_on_all(conn_handler.select(send_handler))
-        .map_err(|_| println!("Error while running core loop"))
-        .unwrap();
-
+    println!("Client {} ({}) connection handler part 2a finished. Placeholders for loops.", client_id, addr);
+    
     Ok(())
 }
 
-fn process_message(id: u32, msg: &OwnedMessage, entities: Arc<RwLock<HashMap<u32, Entity>>>) {
-    if let OwnedMessage::Text(ref txt) = *msg {
-        entities.write().unwrap().entry(id).and_modify(|e| e.process_message(txt));
-    }
-}
+
+// Placeholder for periodic broadcast - to be implemented in Part 3
+// async fn periodic_broadcast(state: GameState) {
+//     // TODO
+// }
