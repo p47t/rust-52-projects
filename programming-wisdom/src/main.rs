@@ -1,5 +1,5 @@
 use lambda_runtime::{service_fn, Error, LambdaEvent};
-use serde_json::Value;
+
 
 mod alexa;
 
@@ -18,7 +18,7 @@ fn build_quote_response(quote: &str, author: &str) -> alexa::ResponseRoot {
         response: alexa::Response {
             output_speech: Some(alexa::OutputSpeech {
                 r#type: "PlainText".to_string(),
-                text: Some(format!("{} said {}", author, quote)),
+                text: Some(format!("{author} said {quote}")),
                 ssml: None,
                 play_behavior: None,
             }),

@@ -24,20 +24,21 @@ fn count_words<R: Read>(input: &mut R) -> Result<u32, WordCountError> {
         }
     }
     if word_count == 0 {
-        return Err(WordCountError::EmptySource);
+        Err(WordCountError::EmptySource)
+    } else {
+        Ok(word_count)
     }
-    Ok(word_count)
 }
 
 fn main() -> anyhow::Result<()> {
     for filename in env::args().skip(1).collect::<Vec<String>>() {
         let mut reader = File::open(&filename).context(
-            format!("unable to open '{}'", filename)
+            format!("unable to open '{filename}'")
         )?;
         let word_count = count_words(&mut reader).context(
-            format!("unable to count words in '{}", filename)
+            format!("unable to count words in '{filename}'")
         )?;
-        println!("{} {}", word_count, filename);
+        println!("{word_count} {filename}");
     }
 
     Ok(())
@@ -60,7 +61,7 @@ mod tests {
     }
 
     impl<'a> io::Read for ErrReader<'a> {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
             Err(io::Error::new(self.kind, self.msg))
         }
     }
@@ -68,6 +69,6 @@ mod tests {
     #[test]
     fn read_broken_pipe() {
         let mut f = ErrReader::new(ErrorKind::BrokenPipe, "read: broken pipe");
-        let err = count_words(&mut f).unwrap_err();
+        let _err = count_words(&mut f).unwrap_err();
     }
 }
