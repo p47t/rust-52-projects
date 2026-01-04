@@ -119,7 +119,7 @@ impl Storage {
         let job = stmt
             .query_row(
                 params![JobStatus::Running as i32, now, JobStatus::Pending as i32],
-                |row| Ok(self.row_to_job(row)?),
+                |row| self.row_to_job(row),
             )
             .optional()?;
 
@@ -135,7 +135,7 @@ impl Storage {
         )?;
 
         let job = stmt
-            .query_row(params![id.to_string()], |row| Ok(self.row_to_job(row)?))
+            .query_row(params![id.to_string()], |row| self.row_to_job(row))
             .optional()?;
 
         Ok(job)
@@ -488,7 +488,7 @@ mod tests {
     fn test_all_job_statuses() {
         let (storage, _temp) = create_test_storage();
 
-        let statuses = vec![
+        let statuses = [
             JobStatus::Pending,
             JobStatus::Running,
             JobStatus::Completed,
