@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  find-projects:
+    name: Find Changed Projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+      all-projects: ${{ steps.find.outputs.all-projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find all projects
+        id: find
+        run: |
+          # Find all directories with Cargo.toml
+          projects=$(find . -maxdepth 2 -name "Cargo.toml" -type f | sed 's|/Cargo.toml||' | sed 's|^\./||' | jq -R -s -c 'split("\n")[:-1]')
+          echo "all-projects=$projects" >> $GITHUB_OUTPUT
+
+          # For pull requests, try to detect changed projects
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+            changed_projects=$(echo "$changed_files" | grep -o '^[^/]*' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+
+            # Filter to only include projects with Cargo.toml
+            filtered_projects=$(echo "$projects" | jq -c --argjson changed "$changed_projects" '[.[] | select(. as $p | $changed[] | . == $p)]')
+
+            if [ "$filtered_projects" = "[]" ] || [ -z "$filtered_projects" ]; then
+              echo "No Rust projects changed, using all projects"
+              echo "projects=$projects" >> $GITHUB_OUTPUT
+            else
+              echo "Changed projects: $filtered_projects"
+              echo "projects=$filtered_projects" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For push events, test all projects
+            echo "projects=$projects" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-test:
+    name: Build and Test
+    needs: find-projects
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.find-projects.outputs.projects) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.project }}/target
+          key: ${{ runner.os }}-target-${{ matrix.project }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.project)) }}
+          restore-keys: |
+            ${{ runner.os }}-target-${{ matrix.project }}-
+
+      - name: Check project exists
+        working-directory: ${{ matrix.project }}
+        run: |
+          if [ ! -f "Cargo.toml" ]; then
+            echo "Error: Cargo.toml not found in ${{ matrix.project }}"
+            exit 1
+          fi
+
+      - name: Check formatting
+        working-directory: ${{ matrix.project }}
+        run: cargo fmt -- --check
+        continue-on-error: true
+
+      - name: Run clippy
+        working-directory: ${{ matrix.project }}
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        continue-on-error: true
+
+      - name: Build project
+        working-directory: ${{ matrix.project }}
+        run: cargo build --verbose
+
+      - name: Run tests
+        working-directory: ${{ matrix.project }}
+        run: cargo test --verbose
+
+      - name: Build release
+        working-directory: ${{ matrix.project }}
+        run: cargo build --release --verbose
+
+  all-checks-complete:
+    name: All Checks Complete
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark as successful
+        run: echo "All project builds and tests completed successfully!"
