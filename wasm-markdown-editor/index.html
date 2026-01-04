@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Markdown Editor</title>
+    <link rel="stylesheet" href="www/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Markdown Editor</h1>
+            <p class="subtitle">Powered by Rust + WebAssembly</p>
+        </header>
+
+        <div class="toolbar">
+            <button id="clearBtn" title="Clear editor">🗑️ Clear</button>
+            <button id="exportBtn" title="Export to HTML">💾 Export HTML</button>
+            <button id="loadSampleBtn" title="Load sample markdown">📄 Load Sample</button>
+            <div class="stats-container">
+                <span id="wordCount" class="stat">Words: 0</span>
+                <span id="charCount" class="stat">Characters: 0</span>
+                <span id="readTime" class="stat">Reading time: 0 min</span>
+            </div>
+        </div>
+
+        <div class="editor-container">
+            <div class="editor-pane">
+                <div class="pane-header">Markdown Input</div>
+                <textarea id="markdownInput" placeholder="Type your markdown here...
+
+# Heading 1
+## Heading 2
+
+**Bold text** and *italic text*
+
+- List item 1
+- List item 2
+
+[Link](https://example.com)
+
+```rust
+fn main() {
+    println!(&quot;Hello, WASM!&quot;);
+}
+```
+"></textarea>
+            </div>
+
+            <div class="preview-pane">
+                <div class="pane-header">Live Preview</div>
+                <div id="preview" class="preview-content">
+                    <p class="placeholder">Preview will appear here...</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Built with Rust, WASM, and <code>pulldown-cmark</code></p>
+        </footer>
+    </div>
+
+    <script type="module" src="www/index.js"></script>
+</body>
+</html>

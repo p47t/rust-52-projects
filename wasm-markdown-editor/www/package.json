@@ -1,0 +1,21 @@
+{
+  "name": "wasm-markdown-editor-www",
+  "version": "0.1.0",
+  "description": "Web frontend for WASM markdown editor",
+  "main": "index.js",
+  "scripts": {
+    "build": "wasm-pack build --target web",
+    "serve": "python -m http.server 8080",
+    "dev": "npm run build && npm run serve"
+  },
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "rust",
+    "markdown",
+    "editor"
+  ],
+  "author": "Your Name",
+  "license": "MIT OR Apache-2.0",
+  "devDependencies": {}
+}
