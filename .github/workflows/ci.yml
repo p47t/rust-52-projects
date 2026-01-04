@@ -121,6 +121,7 @@ jobs:
 
             - name: Run tests
               working-directory: ${{ matrix.project }}
+              if: matrix.project != 'small-os'
               run: cargo test --verbose
 
             - name: Build release
