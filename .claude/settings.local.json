@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo:*)",
+      "Bash(rustc:*)",
+      "Bash(wasm-pack:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
