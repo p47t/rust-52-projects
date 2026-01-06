@@ -1,0 +1,5 @@
+error: Builder can only be derived for structs with named fields, not tuple structs
+ --> tests/compile_fail/tuple_struct_not_supported.rs:4:1
+  |
+4 | struct TupleStruct(String, i32);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

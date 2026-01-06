@@ -1,0 +1,5 @@
+error: Builder cannot be derived for unit structs
+ --> tests/compile_fail/unit_struct_not_supported.rs:4:1
+  |
+4 | struct UnitStruct;
+  | ^^^^^^^^^^^^^^^^^^

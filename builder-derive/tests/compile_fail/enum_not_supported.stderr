@@ -1,0 +1,8 @@
+error: Builder can only be derived for structs, not enums
+ --> tests/compile_fail/enum_not_supported.rs:4:1
+  |
+4 | / enum MyEnum {
+5 | |     Variant1,
+6 | |     Variant2,
+7 | | }
+  | |_^

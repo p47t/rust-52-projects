@@ -4,7 +4,8 @@
       "Bash(cargo:*)",
       "Bash(rustc:*)",
       "Bash(wasm-pack:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cat:*)"
     ]
   }
 }
