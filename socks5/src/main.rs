@@ -1,6 +1,7 @@
 #[cfg(test)]
 use strum::IntoEnumIterator;
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, strum_macros::EnumIter)]
 enum ResponseCode {
     Success = 0x00,

@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use builder_derive::Builder;
 
 #[derive(Builder, Debug)]

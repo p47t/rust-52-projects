@@ -4,7 +4,7 @@ use crate::ebml;
 
 pub enum Level1Element {
     SeekHead(SeekHead),
-    Info(Info),
+    Info(Box<Info>),
     Tracks(Tracks),
     Chapters,
     Cluster,
@@ -27,7 +27,7 @@ impl Level1Element {
             }
             0x1549A966 => {
                 Info::parse(input).map(|(i, val)| {
-                    (i, Level1Element::Info(val))
+                    (i, Level1Element::Info(Box::new(val)))
                 })
             }
             0x1F43B675 => cluster(input),

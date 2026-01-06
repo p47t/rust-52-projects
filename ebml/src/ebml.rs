@@ -182,7 +182,7 @@ pub struct EBMLSegment<'a> {
 impl<'a> EBMLSegment<'a> {
     const ID: &'static [u8] = &[0x18u8, 0x53, 0x80, 0x67];
 
-    pub fn parse(input: &[u8]) -> IResult<&[u8], EBMLSegment> {
+    pub fn parse(input: &'_ [u8]) -> IResult<&'_ [u8], EBMLSegment<'_>> {
         let (input, _) = nom::take_until_and_consume!(input, EBMLSegment::ID)?;
         let (input, size) = vint(input)?;
         let (input, content) = nom::take!(input, size)?;
@@ -191,7 +191,7 @@ impl<'a> EBMLSegment<'a> {
     }
 }
 
-pub fn parse(input: &[u8]) -> IResult<&[u8], (EBMLHeader, EBMLSegment)> {
+pub fn parse(input: &'_ [u8]) -> IResult<&'_ [u8], (EBMLHeader, EBMLSegment<'_>)> {
     let (input, _) = nom::take_until_and_consume!(input, EBMLHeader::ID)?;
     let (input, header) = EBMLHeader::parse(input)?;
     let (input, segment) = EBMLSegment::parse(input)?;

@@ -101,7 +101,7 @@ fn main() -> Result<(), Error> {
                     println!("thread {:?}: broadcast game state", thread::current().id());
                     let mut conn = connections.write().unwrap();
 
-                    let ids = conn.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>();
+                    let ids = conn.keys().copied().collect::<Vec<_>>();
                     for id in ids.iter() {
                         let sink = conn.remove(id).unwrap();
                         let entities = entities.read().unwrap();
@@ -118,12 +118,12 @@ fn main() -> Result<(), Error> {
                         // spawn a task to send the game state to the client
                         let fut = {
                             let connections = connections.clone();
-                            let id = id.clone();
+                            let id = *id;
 
                             sink.send(OwnedMessage::Text(entities_json))
                                 .and_then(move |sink| {
                                     // Re-insert the entry to the connections map
-                                    connections.write().unwrap().insert(id.clone(), sink);
+                                    connections.write().unwrap().insert(id, sink);
                                     Ok(())
                                 })
                                 .map_err(|_| ())
@@ -136,9 +136,11 @@ fn main() -> Result<(), Error> {
         })
     };
 
-    tokio::runtime::current_thread::block_on_all(conn_handler.select(send_handler))
-        .map_err(|_| println!("Error while running core loop"))
-        .unwrap();
+    tokio::runtime::current_thread::block_on_all(
+        conn_handler.select(send_handler).map(|_| ()).map_err(|_| {
+            println!("Error while running core loop");
+        })
+    ).unwrap_or(());
 
     Ok(())
 }

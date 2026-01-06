@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use core::fmt;
 use volatile::Volatile;
 use lazy_static::lazy_static;

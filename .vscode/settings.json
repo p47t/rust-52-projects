@@ -1,4 +1,5 @@
 {
+    "rust-analyzer.files.excludeDirs": ["small-os"],
     "workbench.colorCustomizations": {
         "activityBar.activeBackground": "#db6551",
         "activityBar.background": "#db6551",
