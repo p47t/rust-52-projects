@@ -72,7 +72,7 @@ fn main() -> Result<(), anyhow::Error> {
                 for field in fields {
                     print!("{}", field.format(&style_sheet)?);
                 }
-                print!("\n");
+                println!();
             }
             Err(..) => {
                 print!("{}", line); // print as it is

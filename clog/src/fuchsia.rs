@@ -56,7 +56,7 @@ impl<'t> FieldStr<'t> for regex::Captures<'t> {
     }
 }
 
-pub fn parse_line(line: &str) -> Result<Vec<Field>, ParseError> {
+pub fn parse_line(line: &str) -> Result<Vec<Field<'_>>, ParseError> {
     if let Some(cap) = RE_LOG.captures(line) {
         match tag_to_class(cap.field("tag")?) {
             Some(class) => Ok(vec![
@@ -73,8 +73,8 @@ pub fn parse_line(line: &str) -> Result<Vec<Field>, ParseError> {
             Field::new("[", ".time", cap.field("time0")?, "]"),
             Field::new(" ", ".time", cap.field("time1")?, ">"),
         ];
-        if let Some(_) = cap.name("content") {
-            if let Some(_) = cap.name("tag") {
+        if cap.name("content").is_some() {
+            if cap.name("tag").is_some() {
                 let tag = cap.field("tag")?;
                 if let Some(class) = tag_to_class(tag) {
                     ret.extend(vec![
@@ -86,7 +86,7 @@ pub fn parse_line(line: &str) -> Result<Vec<Field>, ParseError> {
                         Field::new(" ", ".source", tag, ":"),
                     ]);
                 }
-                if let Some(_) = cap.name("source") {
+                if cap.name("source").is_some() {
                     ret.extend(vec![
                         Field::new(" ", ".source", cap.field("source")?, ":"),
                     ]);
@@ -100,7 +100,7 @@ pub fn parse_line(line: &str) -> Result<Vec<Field>, ParseError> {
                         Field::pre(" ", ".text", cap.field("text")?),
                     ]);
                 }
-            } else if let Some(_) = cap.name("source") {
+            } else if cap.name("source").is_some() {
                 ret.extend(vec![
                     Field::new(" ", ".source", cap.field("source")?, ":"),
                     Field::pre(" ", ".text", cap.field("text")?),
