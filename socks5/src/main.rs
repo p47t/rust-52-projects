@@ -56,19 +56,8 @@ struct SocksReply {
 #[cfg(test)]
 impl SocksReply {
     fn new(status: ResponseCode) -> Self {
-        let buf =  [
-            5,
-            status as u8,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ];
-        Self {buf}
+        let buf = [5, status as u8, 0, 1, 0, 0, 0, 0, 0, 0];
+        Self { buf }
     }
 }
 
@@ -82,5 +71,4 @@ fn test_socks_reply() {
     }
 }
 
-fn main() {
-}
+fn main() {}

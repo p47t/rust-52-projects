@@ -1,6 +1,5 @@
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 
-
 mod alexa;
 
 #[tokio::main]
@@ -26,7 +25,7 @@ fn build_quote_response(quote: &str, author: &str) -> alexa::ResponseRoot {
             reprompt: None,
             should_end_session: None,
             directives: None,
-        }
+        },
     }
 }
 
@@ -35,5 +34,6 @@ async fn my_handler(event: LambdaEvent<alexa::RequestRoot>) -> Result<alexa::Res
 
     Ok(build_quote_response(
         "The best way to predict the future is to invent it.",
-        "Alan Kay"))
+        "Alan Kay",
+    ))
 }

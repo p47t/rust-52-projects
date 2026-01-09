@@ -1,9 +1,9 @@
 #![allow(warnings)]
 
 use core::fmt;
-use volatile::Volatile;
 use lazy_static::lazy_static;
 use spin::Mutex;
+use volatile::Volatile;
 
 #[macro_export]
 macro_rules! print {
@@ -93,7 +93,6 @@ impl Writer {
                     color_code,
                 });
                 self.column_pos += 1;
-
             }
         }
     }

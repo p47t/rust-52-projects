@@ -1,5 +1,5 @@
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::sync::{mpsc, Mutex, Arc};
 use std::thread::JoinHandle;
 
 pub struct ThreadPool {
@@ -49,7 +49,10 @@ impl Worker {
             }
         });
 
-        Worker { id, thread: Some(thread) }
+        Worker {
+            id,
+            thread: Some(thread),
+        }
     }
 }
 
@@ -68,13 +71,13 @@ impl ThreadPool {
             workers.push(Worker::new(i, receiver.clone()))
         }
 
-        ThreadPool {
-            workers,
-            sender,
-        }
+        ThreadPool { workers, sender }
     }
 
-    pub fn execute<F>(&self, f: F) where F: FnOnce() + Send + 'static {
+    pub fn execute<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
         // NOTE: important to understand why Box is needed
         let job = Box::new(f);
         self.sender.send(Message::NewJob(job)).unwrap();
@@ -83,7 +86,6 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-
         for _ in &mut self.workers {
             self.sender.send(Message::Terminate).unwrap();
         }

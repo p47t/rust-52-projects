@@ -18,9 +18,9 @@ pub fn vint(input: &[u8]) -> IResult<&[u8], u64> {
     let end = lz as usize + 1;
 
     // concat the following bytes
-    val = input[1..end].iter().fold(val, |acc, &b| {
-        (acc << 8) | (b as u64)
-    });
+    val = input[1..end]
+        .iter()
+        .fold(val, |acc, &b| (acc << 8) | (b as u64));
 
     Ok((&input[end..], val))
 }
@@ -40,9 +40,9 @@ pub fn vid(input: &[u8]) -> IResult<&[u8], u64> {
     let end = lz as usize + 1;
 
     // concat the following bytes
-    val = input[1..end].iter().fold(val, |acc, &b| {
-        (acc << 8) | (b as u64)
-    });
+    val = input[1..end]
+        .iter()
+        .fold(val, |acc, &b| (acc << 8) | (b as u64));
 
     Ok((&input[end..], val))
 }
@@ -57,13 +57,13 @@ pub fn uint(input: &[u8]) -> IResult<&[u8], u64> {
     if input.len() < size {
         return Err(nom::Err::Incomplete(::nom::Needed::Size(size)));
     }
-    let val = input[..size].iter().fold(0u64, |acc, &b| {
-        (acc << 8) | (b as u64)
-    });
+    let val = input[..size]
+        .iter()
+        .fold(0u64, |acc, &b| (acc << 8) | (b as u64));
     Ok((&input[size..], val))
 }
 
-pub fn bool(input: &[u8]) ->IResult<&[u8], bool> {
+pub fn bool(input: &[u8]) -> IResult<&[u8], bool> {
     let (i, val) = uint(input)?;
     Ok((i, val != 0))
 }

@@ -11,13 +11,15 @@ struct StyleSheet<'a> {
 
 impl<'a> StyleSheet<'a> {
     fn new(init: Vec<(&'a str, &'a str)>) -> Self {
-        StyleSheet { inner: init.iter().cloned().collect() }
+        StyleSheet {
+            inner: init.iter().cloned().collect(),
+        }
     }
 
     fn get(&self, class: &str) -> Result<&str, anyhow::Error> {
         match self.inner.get(class) {
             Some(&color) => Ok(color),
-            _ => Err(anyhow!("class not found"))
+            _ => Err(anyhow!("class not found")),
         }
     }
 }
@@ -31,23 +33,45 @@ pub struct Field<'a> {
 }
 
 impl<'a> Field<'a> {
-    fn new(prefix: &'static str, class: &'static str, content: &'a str, postfix: &'static str) -> Self {
-        Field { prefix, class, content, postfix }
+    fn new(
+        prefix: &'static str,
+        class: &'static str,
+        content: &'a str,
+        postfix: &'static str,
+    ) -> Self {
+        Field {
+            prefix,
+            class,
+            content,
+            postfix,
+        }
     }
 
     fn pos(class: &'static str, content: &'a str, postfix: &'static str) -> Self {
-        Field { prefix: "", class, content, postfix }
+        Field {
+            prefix: "",
+            class,
+            content,
+            postfix,
+        }
     }
 
     fn pre(prefix: &'static str, class: &'static str, content: &'a str) -> Self {
-        Field { prefix, class, content, postfix: "" }
+        Field {
+            prefix,
+            class,
+            content,
+            postfix: "",
+        }
     }
 
     fn format(&self, style_sheet: &StyleSheet) -> Result<String, anyhow::Error> {
-        Ok(format!("{}{}{}",
-                   self.prefix.color(style_sheet.get(".text")?),
-                   self.content.color(style_sheet.get(self.class)?),
-                   self.postfix.color(style_sheet.get(".text")?)))
+        Ok(format!(
+            "{}{}{}",
+            self.prefix.color(style_sheet.get(".text")?),
+            self.content.color(style_sheet.get(self.class)?),
+            self.postfix.color(style_sheet.get(".text")?)
+        ))
     }
 }
 

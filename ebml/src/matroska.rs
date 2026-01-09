@@ -1,6 +1,6 @@
-use nom::IResult;
-use crate::ebml::{vid, vint, skip, binary, float, uint, string};
 use crate::ebml;
+use crate::ebml::{binary, float, skip, string, uint, vid, vint};
+use nom::IResult;
 
 pub enum Level1Element {
     SeekHead(SeekHead),
@@ -21,24 +21,16 @@ impl Level1Element {
         match id {
             0x114D9B74 => {
                 // Convert the result to the common Level1Element type
-                SeekHead::parse(input).map(|(i, val)| {
-                    (i, Level1Element::SeekHead(val))
-                })
+                SeekHead::parse(input).map(|(i, val)| (i, Level1Element::SeekHead(val)))
             }
             0x1549A966 => {
-                Info::parse(input).map(|(i, val)| {
-                    (i, Level1Element::Info(Box::new(val)))
-                })
+                Info::parse(input).map(|(i, val)| (i, Level1Element::Info(Box::new(val))))
             }
             0x1F43B675 => cluster(input),
             0x1043A770 => chapters(input),
             0x1254C367 => tags(input),
             0x1941A469 => attachments(input),
-            0x1654AE6B => {
-                Tracks::parse(input).map(|(i, val)| {
-                    (i, Level1Element::Tracks(val))
-                })
-            }
+            0x1654AE6B => Tracks::parse(input).map(|(i, val)| (i, Level1Element::Tracks(val))),
             0x1C53BB6B => cues(input),
             0xEC => {
                 let (input, size) = skip(input)?;
@@ -154,7 +146,7 @@ impl Info {
 
 #[derive(Default)]
 pub struct Tracks {
-    pub tracks: Vec<Track>
+    pub tracks: Vec<Track>,
 }
 
 impl Tracks {
@@ -398,7 +390,7 @@ mod tests {
         let (input, element) = res.unwrap();
         match element {
             Level1Element::SeekHead(_) => (),
-            _ => panic!()
+            _ => panic!(),
         }
 
         let res = Level1Element::parse(input);
@@ -406,7 +398,7 @@ mod tests {
         let (input, element) = res.unwrap();
         match element {
             Level1Element::Info(_) => (),
-            _ => panic!()
+            _ => panic!(),
         }
 
         let res = Level1Element::parse(input);
@@ -414,7 +406,7 @@ mod tests {
         let (input, element) = res.unwrap();
         match element {
             Level1Element::Tracks(_) => (),
-            _ => panic!()
+            _ => panic!(),
         }
 
         let res = Level1Element::parse(input);
@@ -422,7 +414,7 @@ mod tests {
         let (input, element) = res.unwrap();
         match element {
             Level1Element::Cues => (),
-            _ => panic!()
+            _ => panic!(),
         }
 
         let res = Level1Element::parse(input);
@@ -430,7 +422,7 @@ mod tests {
         let (_input, element) = res.unwrap();
         match element {
             Level1Element::Cluster => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 }

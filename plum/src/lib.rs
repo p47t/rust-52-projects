@@ -2,8 +2,8 @@ extern crate bit_vec;
 
 use bit_vec::BitVec;
 use std::collections::hash_map::{DefaultHasher, RandomState};
-use std::marker::PhantomData;
 use std::hash::{BuildHasher, Hash, Hasher};
+use std::marker::PhantomData;
 
 pub struct StandardBloomFilter<T: ?Sized> {
     bitmap: BitVec,
@@ -39,7 +39,10 @@ impl<T: ?Sized> StandardBloomFilter<T> {
         }
     }
 
-    pub fn insert(&mut self, item: &T) where T: Hash {
+    pub fn insert(&mut self, item: &T)
+    where
+        T: Hash,
+    {
         let (h1, h2) = self.hash_kernel(item);
         for k_i in 0..self.optimal_k {
             let index = self.get_index(h1, h2, k_i as u64);
@@ -47,7 +50,10 @@ impl<T: ?Sized> StandardBloomFilter<T> {
         }
     }
 
-    fn hash_kernel(&self, item: &T) -> (u64, u64) where T: Hash {
+    fn hash_kernel(&self, item: &T) -> (u64, u64)
+    where
+        T: Hash,
+    {
         let hasher1 = &mut self.hashers[0].clone();
         let hasher2 = &mut self.hashers[1].clone();
         item.hash(hasher1);
@@ -60,7 +66,10 @@ impl<T: ?Sized> StandardBloomFilter<T> {
         (h1.wrapping_add(k_i.wrapping_mul(h2)) % self.optimal_m) as usize
     }
 
-    pub fn contains(&self, item: &T) -> bool where T: Hash {
+    pub fn contains(&self, item: &T) -> bool
+    where
+        T: Hash,
+    {
         let (h1, h2) = self.hash_kernel(item);
         for k_i in 0..self.optimal_k {
             let index = self.get_index(h1, h2, k_i as u64);

@@ -34,7 +34,7 @@ impl<TS> Calculator<TS> {
     }
 }
 
-impl<TS: Iterator<Item=Token>> Calculator<TS> {
+impl<TS: Iterator<Item = Token>> Calculator<TS> {
     // program:
     //      end
     //      expr_list end
@@ -180,7 +180,8 @@ impl Iterator for TokenStream {
                 ')' => return Some(Token::RP),
                 '=' => return Some(Token::Assign),
                 '0'..='9' | '.' => {
-                    self.offset += self.input[self.offset..].iter()
+                    self.offset += self.input[self.offset..]
+                        .iter()
                         .position(|c| !c.is_digit(10) && *c != '.')
                         .unwrap_or(0);
                     let number: String = self.input[begin..self.offset].iter().collect();
@@ -191,7 +192,8 @@ impl Iterator for TokenStream {
                     };
                 }
                 x if x.is_alphabetic() => {
-                    self.offset += self.input[self.offset..].iter()
+                    self.offset += self.input[self.offset..]
+                        .iter()
                         .position(|c| !c.is_alphabetic() && *c != '_')
                         .unwrap_or(0);
                     let name = self.input[begin..self.offset].iter().collect();
@@ -234,7 +236,8 @@ mod tests {
                 Token::Name("x".to_owned()),
                 Token::Plus,
                 Token::Name("y".to_owned()),
-            ].into_iter(),
+            ]
+            .into_iter(),
         );
         let lines = calc.calculate();
         assert_eq!(lines, vec!["1", "3", "4"]);
@@ -242,24 +245,23 @@ mod tests {
 
     #[test]
     fn test_program_1() {
-        let mut calc = Calculator::new(
-            TokenStream::new("x = 1; y = (x + 2*3/2 - 1); z = 0.5; x + y * z"));
+        let mut calc = Calculator::new(TokenStream::new(
+            "x = 1; y = (x + 2*3/2 - 1); z = 0.5; x + y * z",
+        ));
         let lines = calc.calculate();
         assert_eq!(lines, vec!["1", "3", "0.5", "2.5"]);
     }
 
     #[test]
     fn test_program_2() {
-        let mut calc = Calculator::new(
-            TokenStream::new("r = 10; a = pi * r * r"));
+        let mut calc = Calculator::new(TokenStream::new("r = 10; a = pi * r * r"));
         let lines = calc.calculate();
         assert_eq!(lines, vec!["10", "314.1592653589793"]);
     }
 
     #[test]
     fn test_program_3() {
-        let mut calc = Calculator::new(
-            TokenStream::new("1/0"));
+        let mut calc = Calculator::new(TokenStream::new("1/0"));
         let lines = calc.calculate();
         assert_eq!(lines, vec!["inf"]);
     }

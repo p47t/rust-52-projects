@@ -4,12 +4,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use failure::Error;
-use futures::{Future, Stream};
 use futures::future::Loop;
 use futures::sink::Sink;
-use websocket::OwnedMessage;
-use websocket::server::InvalidConnection;
+use futures::{Future, Stream};
 use websocket::server::r#async::Server;
+use websocket::server::InvalidConnection;
+use websocket::OwnedMessage;
 
 #[derive(Default)]
 pub struct Entity {
@@ -19,15 +19,26 @@ pub struct Entity {
 
 impl Entity {
     pub fn to_json(&self) -> String {
-        format!("{{\"position\":{{\"x\":{},\"y\":{}}}, \"id\":{}}}", self.pos.0, self.pos.1, self.id)
+        format!(
+            "{{\"position\":{{\"x\":{},\"y\":{}}}, \"id\":{}}}",
+            self.pos.0, self.pos.1, self.id
+        )
     }
 
     fn process_message(&mut self, txt: &str) {
         match txt {
-            "R" => { self.pos.0 += 10; }
-            "L" => { self.pos.0 -= 10; }
-            "D" => { self.pos.1 += 10; }
-            "U" => { self.pos.1 -= 10; }
+            "R" => {
+                self.pos.0 += 10;
+            }
+            "L" => {
+                self.pos.0 -= 10;
+            }
+            "D" => {
+                self.pos.1 += 10;
+            }
+            "U" => {
+                self.pos.1 -= 10;
+            }
             _ => {}
         }
     }
@@ -45,7 +56,8 @@ fn main() -> Result<(), Error> {
         let entities = entities.clone();
         let counter = counter.clone();
 
-        server.incoming()
+        server
+            .incoming()
             .map_err(|InvalidConnection { error, .. }| error)
             .for_each(move |(upgrade, addr)| {
                 println!("client addr: {}", addr);
@@ -55,36 +67,48 @@ fn main() -> Result<(), Error> {
                     let entities = entities.clone();
                     let counter = counter.clone();
 
-                    upgrade.accept().and_then(move |(framed, _)| {
-                        let (sink, stream) = framed.split();
+                    upgrade
+                        .accept()
+                        .and_then(move |(framed, _)| {
+                            let (sink, stream) = framed.split();
 
-                        // generate an ID for the client
-                        {
-                            let mut c = counter.write().unwrap();
-                            *c += 1;
-                        }
-                        let id = *counter.read().unwrap();
-                        println!("new client {}", id);
+                            // generate an ID for the client
+                            {
+                                let mut c = counter.write().unwrap();
+                                *c += 1;
+                            }
+                            let id = *counter.read().unwrap();
+                            println!("new client {}", id);
 
-                        // add id to Sink mapping
-                        connections.write().unwrap().insert(id, sink);
-                        // add id to Entity mapping
-                        entities.write().unwrap().insert(id, Entity { id, ..Default::default() });
+                            // add id to Sink mapping
+                            connections.write().unwrap().insert(id, sink);
+                            // add id to Entity mapping
+                            entities.write().unwrap().insert(
+                                id,
+                                Entity {
+                                    id,
+                                    ..Default::default()
+                                },
+                            );
 
-                        // spawn a task to handle message from this client
-                        let fut = stream.for_each(move |msg| {
-                            println!("message for client {}", id);
-                            process_message(id, &msg, entities.clone());
+                            // spawn a task to handle message from this client
+                            let fut = stream
+                                .for_each(move |msg| {
+                                    println!("message for client {}", id);
+                                    process_message(id, &msg, entities.clone());
+                                    Ok(())
+                                })
+                                .map_err(|_| ());
+                            tokio::spawn(fut);
+
                             Ok(())
-                        }).map_err(|_| ());
-                        tokio::spawn(fut);
-
-                        Ok(())
-                    }).map_err(|_| ())
+                        })
+                        .map_err(|_| ())
                 };
                 tokio::spawn(accept);
                 Ok(())
-            }).map_err(|_| ())
+            })
+            .map_err(|_| ())
     };
 
     let send_handler = {
@@ -111,9 +135,14 @@ fn main() -> Result<(), Error> {
                             Some((_, e)) => e,
                             None => return Ok(Loop::Continue(())),
                         };
-                        let entities_json = format!("[{}]", entities.iter().skip(1)
-                            .map(|(_, e)| e.to_json())
-                            .fold(first.to_json(), |acc, s| format!("{},{}", s, acc)));
+                        let entities_json = format!(
+                            "[{}]",
+                            entities
+                                .iter()
+                                .skip(1)
+                                .map(|(_, e)| e.to_json())
+                                .fold(first.to_json(), |acc, s| format!("{},{}", s, acc))
+                        );
 
                         // spawn a task to send the game state to the client
                         let fut = {
@@ -139,14 +168,19 @@ fn main() -> Result<(), Error> {
     tokio::runtime::current_thread::block_on_all(
         conn_handler.select(send_handler).map(|_| ()).map_err(|_| {
             println!("Error while running core loop");
-        })
-    ).unwrap_or(());
+        }),
+    )
+    .unwrap_or(());
 
     Ok(())
 }
 
 fn process_message(id: u32, msg: &OwnedMessage, entities: Arc<RwLock<HashMap<u32, Entity>>>) {
     if let OwnedMessage::Text(ref txt) = *msg {
-        entities.write().unwrap().entry(id).and_modify(|e| e.process_message(txt));
+        entities
+            .write()
+            .unwrap()
+            .entry(id)
+            .and_modify(|e| e.process_message(txt));
     }
 }

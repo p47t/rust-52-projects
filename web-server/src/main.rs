@@ -1,8 +1,8 @@
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
 use std::fs::File;
-use std::time::Duration;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::thread;
+use std::time::Duration;
 use web_server::ThreadPool;
 
 fn main() {

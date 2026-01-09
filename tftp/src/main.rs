@@ -3,8 +3,8 @@ use failure::{err_msg, Error};
 use crate::client::Client;
 use crate::server::Server;
 
-mod server;
 mod client;
+mod server;
 mod tftp;
 
 const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:34254";
@@ -38,8 +38,8 @@ fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use crate::client::Client;
-    use crate::DEFAULT_SERVER_ADDR;
     use crate::server::Server;
+    use crate::DEFAULT_SERVER_ADDR;
 
     #[test]
     #[ignore]

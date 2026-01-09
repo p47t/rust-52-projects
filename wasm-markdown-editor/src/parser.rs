@@ -45,10 +45,7 @@ pub fn calculate_stats(text: &str) -> Statistics {
     let lines = text.lines().count();
 
     // Count paragraphs (groups of non-empty lines)
-    let paragraphs = text
-        .split("\n\n")
-        .filter(|s| !s.trim().is_empty())
-        .count();
+    let paragraphs = text.split("\n\n").filter(|s| !s.trim().is_empty()).count();
 
     // Reading time: average reading speed is ~200 words per minute
     let reading_time_minutes = if words > 0 {

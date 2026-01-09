@@ -4,12 +4,21 @@ use structopt::StructOpt;
 use rolldice::{multizip, RollResult};
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "rolldice", bin_name = "rolldice", about = "Rolls some numbers of 6 sided dice.")]
+#[structopt(
+    name = "rolldice",
+    bin_name = "rolldice",
+    about = "Rolls some numbers of 6 sided dice."
+)]
 struct Config {
     #[structopt(short = "n", help = "Number of dice", default_value = "1")]
     number_of_dice: u16,
 
-    #[structopt(short = "r", long = "rowsize", help = "Maximum dice per row", default_value = "8")]
+    #[structopt(
+        short = "r",
+        long = "rowsize",
+        help = "Maximum dice per row",
+        default_value = "8"
+    )]
     dice_per_row: u16,
 }
 

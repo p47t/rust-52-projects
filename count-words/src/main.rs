@@ -1,8 +1,8 @@
-use std::io::{Read, BufReader, BufRead};
+use anyhow::Context;
 use std::env;
 use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
 use thiserror::Error;
-use anyhow::Context;
 
 #[derive(Error, Debug)]
 pub enum WordCountError {
@@ -32,12 +32,9 @@ fn count_words<R: Read>(input: &mut R) -> Result<u32, WordCountError> {
 
 fn main() -> anyhow::Result<()> {
     for filename in env::args().skip(1).collect::<Vec<String>>() {
-        let mut reader = File::open(&filename).context(
-            format!("unable to open '{filename}'")
-        )?;
-        let word_count = count_words(&mut reader).context(
-            format!("unable to count words in '{filename}'")
-        )?;
+        let mut reader = File::open(&filename).context(format!("unable to open '{filename}'"))?;
+        let word_count =
+            count_words(&mut reader).context(format!("unable to count words in '{filename}'"))?;
         println!("{word_count} {filename}");
     }
 

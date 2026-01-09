@@ -1,4 +1,4 @@
-use actix_web::{HttpServer, web, App, Error, HttpRequest, Responder, HttpResponse};
+use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 use futures::stream::StreamExt; // Removed TryStreamExt and future::{Future, ok}
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -20,11 +20,9 @@ async fn download_file(path: web::Path<String>, store: web::Data<FileStore>) -> 
     let filename = path.into_inner();
     let store_guard = store.lock().unwrap();
     match store_guard.get(&filename) {
-        Some(file_bytes) => {
-            HttpResponse::Ok()
-                .content_type("application/octet-stream")
-                .body(file_bytes.clone())
-        }
+        Some(file_bytes) => HttpResponse::Ok()
+            .content_type("application/octet-stream")
+            .body(file_bytes.clone()),
         None => HttpResponse::NotFound().finish(),
     }
 }
@@ -40,7 +38,7 @@ async fn upload_specified_file(
         let chunk = chunk?;
         body.extend_from_slice(&chunk);
     }
-    
+
     let mut store_guard = store.lock().unwrap();
     store_guard.insert(filename, body.freeze());
     Ok(HttpResponse::Ok().finish())
@@ -76,9 +74,11 @@ async fn main() -> std::io::Result<()> {
     println!("Listening at address {}...", server_address);
 
     // Initialize the shared file store
-    let file_store_data = web::Data::new(Arc::new(Mutex::new(HashMap::<String, web::Bytes>::new())));
+    let file_store_data =
+        web::Data::new(Arc::new(Mutex::new(HashMap::<String, web::Bytes>::new())));
 
-    HttpServer::new(move || { // Closure needs to be move due to file_store_data
+    HttpServer::new(move || {
+        // Closure needs to be move due to file_store_data
         App::new()
             .app_data(file_store_data.clone()) // Add shared state
             .service(

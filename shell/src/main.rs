@@ -26,7 +26,10 @@ struct Command {
 impl Command {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Child, Error> {
         Ok(std::process::Command::new(&self.program)
-            .stdin(cin).stdout(cout).args(&self.args).spawn()?)
+            .stdin(cin)
+            .stdout(cout)
+            .args(&self.args)
+            .spawn()?)
     }
 }
 
@@ -44,7 +47,9 @@ struct Pipeline {
 impl Executable for Pipeline {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Vec<Child>, Error> {
         let mut left = self.left.execute(cin, Stdio::piped())?;
-        let right = self.right.execute(Stdio::from(left.stdout.take().unwrap()), cout)?;
+        let right = self
+            .right
+            .execute(Stdio::from(left.stdout.take().unwrap()), cout)?;
         let mut children = vec![left];
         children.extend(right);
         Ok(children)
@@ -79,16 +84,15 @@ fn command(input: &[u8]) -> IResult<&[u8], Command> {
 }
 
 fn pipeline(input: &[u8]) -> IResult<&[u8], Box<dyn Executable>> {
-    map(
-        tuple((command, pipe, cmdline)),
-        |(left, _, right)| Box::new(Pipeline { left, right }) as Box<dyn Executable>
-    )(input)
+    map(tuple((command, pipe, cmdline)), |(left, _, right)| {
+        Box::new(Pipeline { left, right }) as Box<dyn Executable>
+    })(input)
 }
 
 fn cmdline(input: &[u8]) -> IResult<&[u8], Box<dyn Executable>> {
     alt((
         pipeline,
-        map(command, |c| Box::new(c) as Box<dyn Executable>)
+        map(command, |c| Box::new(c) as Box<dyn Executable>),
     ))(input)
 }
 
@@ -97,17 +101,15 @@ fn parse_and_execute(line: &str) {
         return;
     }
     match cmdline(line.as_bytes()) {
-        Ok((_, exe)) => {
-            match exe.execute(Stdio::inherit(), Stdio::inherit()) {
-                Err(why) => eprintln!("Failed to execute: {}", why),
-                Ok(children) => {
-                    for mut child in children {
-                        let _ = child.wait();
-                    }
+        Ok((_, exe)) => match exe.execute(Stdio::inherit(), Stdio::inherit()) {
+            Err(why) => eprintln!("Failed to execute: {}", why),
+            Ok(children) => {
+                for mut child in children {
+                    let _ = child.wait();
                 }
             }
-        }
-        Err(why) => eprintln!("Failed to parse: {}", why)
+        },
+        Err(why) => eprintln!("Failed to parse: {}", why),
     }
 }
 
