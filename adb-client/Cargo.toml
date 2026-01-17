@@ -1,0 +1,17 @@
+[package]
+name = "adb-client"
+version = "0.1.0"
+edition = "2021"
+description = "An ADB (Android Debug Bridge) client - teaches TCP protocol parsing and binary protocols"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+bytes = "1.5"
+thiserror = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
