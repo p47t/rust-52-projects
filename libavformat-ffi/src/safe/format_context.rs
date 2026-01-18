@@ -1,7 +1,7 @@
 //! Safe wrapper for AVFormatContext.
 
 use crate::bindgen;
-use crate::safe::error::{check_error, AvError, Result};
+use crate::safe::error::{AvError, Result};
 use crate::safe::packet::Packet;
 use std::ffi::{CStr, CString};
 use std::path::Path;

@@ -20,6 +20,9 @@ pub use types::*;
 use std::ffi::c_int;
 use std::os::raw::c_char;
 
+// Allow clashing declarations - this module intentionally re-declares FFI functions
+// that are also declared by bindgen, to demonstrate manual FFI bindings.
+#[allow(clashing_extern_declarations)]
 #[link(name = "avformat")]
 #[link(name = "avcodec")]
 #[link(name = "avutil")]

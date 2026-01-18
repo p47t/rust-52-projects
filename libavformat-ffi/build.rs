@@ -10,10 +10,8 @@ fn main() {
          macOS: brew install ffmpeg",
     );
 
-    let avcodec =
-        pkg_config::probe_library("libavcodec").expect("libavcodec not found");
-    let avutil =
-        pkg_config::probe_library("libavutil").expect("libavutil not found");
+    let avcodec = pkg_config::probe_library("libavcodec").expect("libavcodec not found");
+    let avutil = pkg_config::probe_library("libavutil").expect("libavutil not found");
 
     // Collect all include paths
     let mut include_paths = Vec::new();

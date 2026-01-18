@@ -4,7 +4,7 @@
 //! and how they map to Rust. Only fields we need are included.
 
 use std::ffi::c_int;
-use std::os::raw::{c_char, c_longlong, c_uint, c_void};
+use std::os::raw::{c_longlong, c_uint, c_void};
 
 /// Opaque format context - we only use it as a pointer
 #[repr(C)]
@@ -22,8 +22,9 @@ pub struct AVRational {
 
 /// Media type enumeration
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AVMediaType {
+    #[default]
     Unknown = -1,
     Video = 0,
     Audio = 1,
@@ -31,12 +32,6 @@ pub enum AVMediaType {
     Subtitle = 3,
     Attachment = 4,
     Nb = 5,
-}
-
-impl Default for AVMediaType {
-    fn default() -> Self {
-        AVMediaType::Unknown
-    }
 }
 
 /// Codec parameters - partial definition with commonly accessed fields
