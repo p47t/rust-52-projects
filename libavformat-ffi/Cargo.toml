@@ -1,0 +1,24 @@
+[package]
+name = "libavformat-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "FFI bindings for libavformat demonstrating manual, bindgen, and safe wrapper approaches"
+
+[dependencies]
+thiserror = "1.0"
+
+[build-dependencies]
+bindgen = "0.70"
+pkg-config = "0.3"
+
+[[example]]
+name = "manual_example"
+path = "examples/manual_example.rs"
+
+[[example]]
+name = "bindgen_example"
+path = "examples/bindgen_example.rs"
+
+[[example]]
+name = "safe_example"
+path = "examples/safe_example.rs"
