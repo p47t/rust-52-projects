@@ -1,0 +1,11 @@
+[package]
+name = "guitar-fretboard"
+version = "0.1.0"
+edition = "2021"
+description = "Guitar fretboard visualizer with C Major scale and audio playback"
+license = "MIT"
+
+[dependencies]
+iced = { version = "0.13", features = ["canvas"] }
+rodio = "0.19"
+rand = "0.8"
