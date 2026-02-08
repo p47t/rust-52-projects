@@ -1,0 +1,9 @@
+[package]
+name = "iced-calculator"
+version = "0.1.0"
+edition = "2021"
+description = "A calculator GUI built with Iced"
+license = "MIT"
+
+[dependencies]
+iced = "0.13"
