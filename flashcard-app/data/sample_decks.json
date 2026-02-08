@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Rust Basics",
+    "description": "Core Rust concepts and syntax",
+    "cards": [
+      { "front": "What keyword declares an immutable variable?", "back": "let" },
+      { "front": "How do you make a variable mutable?", "back": "let mut" },
+      { "front": "What is the ownership rule for values in Rust?", "back": "Each value has exactly one owner. When the owner goes out of scope, the value is dropped." },
+      { "front": "What does & mean in a function parameter?", "back": "An immutable reference (borrowing without taking ownership)" },
+      { "front": "What is the difference between String and &str?", "back": "String is an owned, heap-allocated string. &str is a borrowed string slice." },
+      { "front": "What does the ? operator do?", "back": "Propagates errors — returns early with Err if the Result is Err, otherwise unwraps the Ok value." },
+      { "front": "What trait must a type implement to be printed with {:?}?", "back": "std::fmt::Debug" },
+      { "front": "What is an enum with data called in Rust?", "back": "A tagged union (or algebraic data type). Each variant can hold different data." },
+      { "front": "What does #[derive(Clone)] do?", "back": "Auto-implements the Clone trait, allowing .clone() to create a deep copy." },
+      { "front": "How do you handle a None value from an Option?", "back": "Pattern matching (match/if let), .unwrap_or(), .unwrap_or_default(), or the ? operator with Option." }
+    ]
+  },
+  {
+    "name": "World Capitals",
+    "description": "Match countries to their capital cities",
+    "cards": [
+      { "front": "Japan", "back": "Tokyo" },
+      { "front": "France", "back": "Paris" },
+      { "front": "Brazil", "back": "Brasília" },
+      { "front": "Australia", "back": "Canberra" },
+      { "front": "Egypt", "back": "Cairo" },
+      { "front": "Canada", "back": "Ottawa" },
+      { "front": "South Korea", "back": "Seoul" },
+      { "front": "Germany", "back": "Berlin" },
+      { "front": "Thailand", "back": "Bangkok" },
+      { "front": "Argentina", "back": "Buenos Aires" }
+    ]
+  }
+]

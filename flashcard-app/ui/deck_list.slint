@@ -1,0 +1,88 @@
+import { Button, ListView } from "std-widgets.slint";
+import { DeckInfo } from "types.slint";
+
+export component DeckListPage inherits Rectangle {
+    in property <[DeckInfo]> decks;
+    callback study-deck(int);
+    callback add-card(int);
+    callback show-stats(int);
+
+    background: transparent;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        // Header
+        Text {
+            text: "My Decks";
+            font-size: 28px;
+            font-weight: 700;
+            color: #cdd6f4;
+            horizontal-alignment: center;
+        }
+
+        // Deck list
+        ListView {
+            for deck[index] in decks: Rectangle {
+                height: 100px;
+                background: #313244;
+                border-radius: 12px;
+
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 8px;
+
+                    VerticalLayout {
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+
+                        Text {
+                            text: deck.name;
+                            color: #cdd6f4;
+                            font-size: 18px;
+                            font-weight: 600;
+                        }
+
+                        Text {
+                            text: deck.description;
+                            color: #6c7086;
+                            font-size: 13px;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: deck.due-count > 0
+                                ? "\{deck.due-count} cards due · \{deck.card-count} total"
+                                : "All caught up! · \{deck.card-count} cards";
+                            color: deck.due-count > 0 ? #f9e2af : #a6e3a1;
+                            font-size: 14px;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+
+                        Button {
+                            text: "Study";
+                            enabled: deck.due-count > 0;
+                            clicked => { study-deck(index); }
+                        }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Button {
+                                text: "+";
+                                clicked => { add-card(index); }
+                            }
+                            Button {
+                                text: "Stats";
+                                clicked => { show-stats(index); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

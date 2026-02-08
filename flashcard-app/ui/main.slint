@@ -1,0 +1,81 @@
+import { DeckListPage } from "deck_list.slint";
+import { StudyPage } from "study.slint";
+import { CardEditorPage } from "card_editor.slint";
+import { StatsPage } from "stats.slint";
+export { DeckInfo, DeckStats } from "types.slint";
+import { DeckInfo, DeckStats } from "types.slint";
+
+export component MainWindow inherits Window {
+    title: "Flashcard App";
+    preferred-width: 400px;
+    preferred-height: 700px;
+    background: #1e1e2e;
+
+    // Page routing: 0=DeckList, 1=Study, 2=CardEditor, 3=Stats
+    in-out property <int> current-page: 0;
+
+    // Deck list data
+    in property <[DeckInfo]> decks;
+
+    // Study screen data
+    in property <string> study-deck-name;
+    in property <string> card-front;
+    in property <string> card-back;
+    in property <bool> card-revealed: false;
+    in property <int> cards-remaining;
+    in property <int> cards-reviewed;
+
+    // Card editor data
+    in-out property <string> editor-front;
+    in-out property <string> editor-back;
+    in property <bool> editor-is-edit: false;
+
+    // Stats data
+    in property <string> stats-deck-name;
+    in property <DeckStats> stats;
+
+    // Callbacks to Rust
+    callback study-deck(int);
+    callback add-card-to-deck(int);
+    callback show-deck-stats(int);
+    callback reveal-card();
+    callback rate-card(int);
+    callback save-card(string, string);
+    callback delete-card();
+    callback navigate-back();
+
+    // Page routing
+    if current-page == 0: DeckListPage {
+        decks: root.decks;
+        study-deck(idx) => { root.study-deck(idx); }
+        add-card(idx) => { root.add-card-to-deck(idx); }
+        show-stats(idx) => { root.show-deck-stats(idx); }
+    }
+
+    if current-page == 1: StudyPage {
+        deck-name: root.study-deck-name;
+        card-front: root.card-front;
+        card-back: root.card-back;
+        revealed: root.card-revealed;
+        cards-remaining: root.cards-remaining;
+        cards-reviewed: root.cards-reviewed;
+        reveal-card() => { root.reveal-card(); }
+        rate-card(q) => { root.rate-card(q); }
+        go-back() => { root.navigate-back(); }
+    }
+
+    if current-page == 2: CardEditorPage {
+        front-text <=> root.editor-front;
+        back-text <=> root.editor-back;
+        is-edit: root.editor-is-edit;
+        save-card(f, b) => { root.save-card(f, b); }
+        delete-card() => { root.delete-card(); }
+        go-back() => { root.navigate-back(); }
+    }
+
+    if current-page == 3: StatsPage {
+        deck-name: root.stats-deck-name;
+        deck-stats: root.stats;
+        go-back() => { root.navigate-back(); }
+    }
+}

@@ -1,0 +1,118 @@
+import { Button } from "std-widgets.slint";
+import { DeckStats } from "types.slint";
+
+component StatRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <color> value-color: #cdd6f4;
+
+    spacing: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+
+    Text {
+        text: label;
+        color: #a6adc8;
+        font-size: 16px;
+        horizontal-stretch: 1;
+    }
+
+    Text {
+        text: value;
+        color: value-color;
+        font-size: 16px;
+        font-weight: 600;
+    }
+}
+
+export component StatsPage inherits Rectangle {
+    in property <string> deck-name;
+    in property <DeckStats> deck-stats;
+
+    callback go-back();
+
+    background: transparent;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        // Top bar
+        HorizontalLayout {
+            spacing: 8px;
+
+            Button {
+                text: "← Back";
+                clicked => { go-back(); }
+            }
+
+            Text {
+                text: "Statistics";
+                color: #cdd6f4;
+                font-size: 18px;
+                font-weight: 600;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+        }
+
+        // Deck name
+        Text {
+            text: deck-name;
+            color: #cdd6f4;
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+
+        // Stats card
+        Rectangle {
+            background: #313244;
+            border-radius: 12px;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 4px;
+
+                StatRow {
+                    label: "Total Cards";
+                    value: deck-stats.total-cards;
+                }
+
+                Rectangle { height: 1px; background: #45475a; }
+
+                StatRow {
+                    label: "Due Today";
+                    value: deck-stats.due-today;
+                    value-color: deck-stats.due-today > 0 ? #f9e2af : #a6e3a1;
+                }
+
+                Rectangle { height: 1px; background: #45475a; }
+
+                StatRow {
+                    label: "Total Reviews";
+                    value: deck-stats.total-reviews;
+                    value-color: #89b4fa;
+                }
+
+                Rectangle { height: 1px; background: #45475a; }
+
+                StatRow {
+                    label: "Correct Rate";
+                    value: deck-stats.total-reviews > 0
+                        ? "\{round(deck-stats.correct-reviews * 100 / deck-stats.total-reviews)}%"
+                        : "N/A";
+                    value-color: #a6e3a1;
+                }
+
+                Rectangle { height: 1px; background: #45475a; }
+
+                StatRow {
+                    label: "Average Ease";
+                    value: "\{round(deck-stats.average-ease * 100) / 100}";
+                    value-color: #cba6f7;
+                }
+            }
+        }
+    }
+}

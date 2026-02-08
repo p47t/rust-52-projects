@@ -1,0 +1,136 @@
+import { Button } from "std-widgets.slint";
+
+export component StudyPage inherits Rectangle {
+    in property <string> deck-name;
+    in property <string> card-front;
+    in property <string> card-back;
+    in property <bool> revealed: false;
+    in property <int> cards-remaining;
+    in property <int> cards-reviewed;
+
+    callback reveal-card();
+    callback rate-card(int);
+    callback go-back();
+
+    background: transparent;
+
+    VerticalLayout {
+        padding: 16px;
+        padding-bottom: 48px;
+        spacing: 16px;
+
+        // Top bar
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: stretch;
+
+            Button {
+                text: "← Back";
+                clicked => { go-back(); }
+            }
+
+            Text {
+                text: deck-name;
+                color: #cdd6f4;
+                font-size: 18px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+
+            Text {
+                text: "\{cards-reviewed}/\{cards-reviewed + cards-remaining}";
+                color: #6c7086;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
+        }
+
+        // Progress bar
+        Rectangle {
+            height: 4px;
+            background: #45475a;
+            border-radius: 2px;
+
+            Rectangle {
+                height: 4px;
+                width: cards-reviewed + cards-remaining > 0
+                    ? parent.width * (cards-reviewed * 1.0) / ((cards-reviewed + cards-remaining) * 1.0)
+                    : 0px;
+                background: #89b4fa;
+                border-radius: 2px;
+            }
+        }
+
+        // Card area
+        Rectangle {
+            background: #313244;
+            border-radius: 16px;
+            vertical-stretch: 1;
+            min-height: 300px;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 20px;
+                alignment: center;
+
+                // Front
+                Text {
+                    text: card-front;
+                    color: #cdd6f4;
+                    font-size: 22px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+
+                // Divider (visible when revealed)
+                if revealed: Rectangle {
+                    height: 1px;
+                    background: #45475a;
+                }
+
+                // Back (visible when revealed)
+                if revealed: Text {
+                    text: card-back;
+                    color: #a6e3a1;
+                    font-size: 20px;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        // Action area
+        if !revealed: HorizontalLayout {
+            alignment: center;
+            Button {
+                text: "Show Answer";
+                clicked => { reveal-card(); }
+            }
+        }
+
+        if revealed: HorizontalLayout {
+            spacing: 8px;
+            alignment: center;
+
+            Button {
+                text: "Again";
+                clicked => { rate-card(0); }
+            }
+            Button {
+                text: "Hard";
+                clicked => { rate-card(1); }
+            }
+            Button {
+                text: "Good";
+                clicked => { rate-card(2); }
+            }
+            Button {
+                text: "Easy";
+                clicked => { rate-card(3); }
+            }
+        }
+    }
+}

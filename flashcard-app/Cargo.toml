@@ -1,0 +1,27 @@
+[package]
+name = "flashcard-app"
+version = "0.1.0"
+edition = "2021"
+description = "Spaced repetition flashcard app built with Slint UI"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "flashcard"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+dirs = "6"
+
+[features]
+android = ["slint/backend-android-activity-06"]
+
+[build-dependencies]
+slint-build = "1.9"

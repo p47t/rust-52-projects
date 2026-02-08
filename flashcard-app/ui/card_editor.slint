@@ -1,0 +1,87 @@
+import { Button, TextEdit } from "std-widgets.slint";
+
+export component CardEditorPage inherits Rectangle {
+    in-out property <string> front-text;
+    in-out property <string> back-text;
+    in property <bool> is-edit: false;
+
+    callback save-card(string, string);
+    callback delete-card();
+    callback go-back();
+
+    background: transparent;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        // Top bar
+        HorizontalLayout {
+            spacing: 8px;
+
+            Button {
+                text: "← Back";
+                clicked => { go-back(); }
+            }
+
+            Text {
+                text: is-edit ? "Edit Card" : "New Card";
+                color: #cdd6f4;
+                font-size: 18px;
+                font-weight: 600;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+        }
+
+        // Front field
+        Text {
+            text: "Front (Question)";
+            color: #a6adc8;
+            font-size: 14px;
+        }
+
+        Rectangle {
+            background: #313244;
+            border-radius: 8px;
+            min-height: 100px;
+
+            front-edit := TextEdit {
+                text <=> front-text;
+            }
+        }
+
+        // Back field
+        Text {
+            text: "Back (Answer)";
+            color: #a6adc8;
+            font-size: 14px;
+        }
+
+        Rectangle {
+            background: #313244;
+            border-radius: 8px;
+            min-height: 100px;
+
+            back-edit := TextEdit {
+                text <=> back-text;
+            }
+        }
+
+        // Actions
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: center;
+
+            Button {
+                text: "Save";
+                clicked => { save-card(front-text, back-text); }
+            }
+
+            if is-edit: Button {
+                text: "Delete";
+                clicked => { delete-card(); }
+            }
+        }
+    }
+}
