@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Game of Life</title>
+    <link rel="stylesheet" href="www/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Game of Life</h1>
+            <p class="subtitle">WebGPU compute shaders + Rust WASM</p>
+        </header>
+
+        <div class="toolbar">
+            <button id="playBtn" title="Play / Pause (Space)">Play</button>
+            <button id="stepBtn" title="Single step (S)">Step</button>
+            <button id="randomBtn" title="Randomize grid (R)">Random</button>
+            <button id="clearBtn" title="Clear grid (C)">Clear</button>
+            <div class="speed-control">
+                <label for="speedSlider">Speed</label>
+                <input type="range" id="speedSlider" min="1" max="60" value="10">
+                <span id="speedValue">10</span>
+            </div>
+            <div class="stats">
+                <span id="genCounter">Gen: 0</span>
+                <span id="popCounter">Pop: 0</span>
+            </div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="canvas" width="512" height="512"></canvas>
+        </div>
+
+        <footer>
+            <p>Built with Rust, wgpu, and WebAssembly &mdash; click to draw, drag to paint</p>
+        </footer>
+    </div>
+
+    <script type="module" src="www/index.js"></script>
+</body>
+</html>

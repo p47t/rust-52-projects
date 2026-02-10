@@ -26,6 +26,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 22. **iced-calculator** (2026-02-08) - Calculator with expression parser using Iced UI
 23. **guitar-fretboard** (2026-02-08) - Guitar fretboard visualizer with audio playback
 24. **flashcard-app** (2026-02-08) - Spaced repetition learning app with Slint UI (desktop + Android)
+25. **wgpu-game-of-life** (2026-02-09) - Conway's Game of Life with WebGPU compute shaders and WASM
 
 ## Build Commands
 
@@ -45,6 +46,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 
 - **small-os**: Requires nightly Rust, excluded from rust-analyzer, skip tests (bare-metal OS)
 - **wasm-markdown-editor**: Build with `wasm-pack build --target web`
+- **wgpu-game-of-life**: Build with `wasm-pack build --target web`, requires WebGPU-capable browser
 - **builder-derive**: Uses trybuild for compile-fail tests
 - **libavformat-ffi**: Requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **flashcard-app**: Android builds require NDK and cargo-apk (`cargo install cargo-apk`)
@@ -57,7 +59,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 **Utilities**: calculator, count-words, rolldice, plum
 **GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
-**Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor
+**Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life
 **Android**: flashcard-app, adb-client
 **FFI**: libavformat-ffi
 
