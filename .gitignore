@@ -3,4 +3,5 @@ target
 **/*.rs.bk
 /.vscode
 /.claude
+/.playwright-mcp
 CLAUDE.md
