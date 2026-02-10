@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 rand = "0.8.5"
-structopt = "0.3.26" # Note: structopt is now in maintenance mode. Consider migrating to clap 4.x directly in the future.
+clap = { version = "4", features = ["derive"] }

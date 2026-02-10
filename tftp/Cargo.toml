@@ -7,6 +7,4 @@ edition = "2018"
 [dependencies]
 bytes = "1.4.0"
 byteorder = "1.4.3"
-failure = "0.1.8" # Note: The failure crate is deprecated. Consider migrating to anyhow or thiserror in the future.
-# anyhow = "1.0.70" # Uncomment to use anyhow for error handling
-# thiserror = "1.0.40" # Uncomment to use thiserror for error definitions
+anyhow = "1"

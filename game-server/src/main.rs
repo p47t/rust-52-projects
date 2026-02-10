@@ -1,15 +1,12 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
 
-use failure::Error;
-use futures::future::Loop;
-use futures::sink::Sink;
-use futures::{Future, Stream};
-use websocket::server::r#async::Server;
-use websocket::server::InvalidConnection;
-use websocket::OwnedMessage;
+use anyhow::Error;
+use futures_util::{SinkExt, StreamExt};
+use tokio::net::TcpListener;
+use tokio::sync::RwLock;
+use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Default)]
 pub struct Entity {
@@ -44,143 +41,111 @@ impl Entity {
     }
 }
 
-fn main() -> Result<(), Error> {
-    let server = Server::bind("127.0.0.1:8080", &tokio::reactor::Handle::default())?;
+type Tx = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    Message,
+>;
 
-    let connections = Arc::new(RwLock::new(HashMap::new()));
-    let entities = Arc::new(RwLock::new(HashMap::new()));
-    let counter = Arc::new(RwLock::new(0));
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    println!("Listening on 127.0.0.1:8080");
 
-    let conn_handler = {
+    let connections: Arc<RwLock<HashMap<u32, Tx>>> = Arc::new(RwLock::new(HashMap::new()));
+    let entities: Arc<RwLock<HashMap<u32, Entity>>> = Arc::new(RwLock::new(HashMap::new()));
+    let counter: Arc<RwLock<u32>> = Arc::new(RwLock::new(0));
+
+    // Spawn the broadcast loop
+    {
+        let connections = connections.clone();
+        let entities = entities.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(100));
+            loop {
+                interval.tick().await;
+                println!(
+                    "thread {:?}: broadcast game state",
+                    std::thread::current().id()
+                );
+
+                let entities_json = {
+                    let entities = entities.read().await;
+                    if entities.is_empty() {
+                        continue;
+                    }
+                    let json_parts: Vec<String> =
+                        entities.values().map(|e| e.to_json()).collect();
+                    format!("[{}]", json_parts.join(","))
+                };
+
+                let mut conns = connections.write().await;
+                let ids: Vec<u32> = conns.keys().copied().collect();
+                for id in ids {
+                    if let Some(sink) = conns.get_mut(&id) {
+                        if sink
+                            .send(Message::Text(entities_json.clone().into()))
+                            .await
+                            .is_err()
+                        {
+                            conns.remove(&id);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Accept connections
+    loop {
+        let (stream, addr) = listener.accept().await?;
+        println!("client addr: {}", addr);
+
         let connections = connections.clone();
         let entities = entities.clone();
         let counter = counter.clone();
 
-        server
-            .incoming()
-            .map_err(|InvalidConnection { error, .. }| error)
-            .for_each(move |(upgrade, addr)| {
-                println!("client addr: {}", addr);
+        tokio::spawn(async move {
+            let ws_stream = match tokio_tungstenite::accept_async(stream).await {
+                Ok(ws) => ws,
+                Err(e) => {
+                    eprintln!("WebSocket handshake error: {}", e);
+                    return;
+                }
+            };
 
-                let accept = {
-                    let connections = connections.clone();
-                    let entities = entities.clone();
-                    let counter = counter.clone();
+            let id = {
+                let mut c = counter.write().await;
+                *c += 1;
+                *c
+            };
+            println!("new client {}", id);
 
-                    upgrade
-                        .accept()
-                        .and_then(move |(framed, _)| {
-                            let (sink, stream) = framed.split();
+            let (sink, mut stream) = ws_stream.split();
 
-                            // generate an ID for the client
-                            {
-                                let mut c = counter.write().unwrap();
-                                *c += 1;
-                            }
-                            let id = *counter.read().unwrap();
-                            println!("new client {}", id);
+            connections.write().await.insert(id, sink);
+            entities.write().await.insert(
+                id,
+                Entity {
+                    id,
+                    ..Default::default()
+                },
+            );
 
-                            // add id to Sink mapping
-                            connections.write().unwrap().insert(id, sink);
-                            // add id to Entity mapping
-                            entities.write().unwrap().insert(
-                                id,
-                                Entity {
-                                    id,
-                                    ..Default::default()
-                                },
-                            );
+            while let Some(Ok(msg)) = stream.next().await {
+                if let Message::Text(txt) = msg {
+                    println!("message for client {}", id);
+                    entities
+                        .write()
+                        .await
+                        .entry(id)
+                        .and_modify(|e| e.process_message(&txt));
+                }
+            }
 
-                            // spawn a task to handle message from this client
-                            let fut = stream
-                                .for_each(move |msg| {
-                                    println!("message for client {}", id);
-                                    process_message(id, &msg, entities.clone());
-                                    Ok(())
-                                })
-                                .map_err(|_| ());
-                            tokio::spawn(fut);
-
-                            Ok(())
-                        })
-                        .map_err(|_| ())
-                };
-                tokio::spawn(accept);
-                Ok(())
-            })
-            .map_err(|_| ())
-    };
-
-    let send_handler = {
-        let connections = connections.clone();
-        let entities = entities.clone();
-
-        futures::future::loop_fn((), move |_| {
-            let connections = connections.clone();
-            let entities = entities.clone();
-
-            tokio::timer::Delay::new(Instant::now() + Duration::from_millis(100))
-                .map_err(|_| ())
-                .and_then(move |_| {
-                    println!("thread {:?}: broadcast game state", thread::current().id());
-                    let mut conn = connections.write().unwrap();
-
-                    let ids = conn.keys().copied().collect::<Vec<_>>();
-                    for id in ids.iter() {
-                        let sink = conn.remove(id).unwrap();
-                        let entities = entities.read().unwrap();
-
-                        // generate JSON for all entities
-                        let first = match entities.iter().take(1).next() {
-                            Some((_, e)) => e,
-                            None => return Ok(Loop::Continue(())),
-                        };
-                        let entities_json = format!(
-                            "[{}]",
-                            entities
-                                .iter()
-                                .skip(1)
-                                .map(|(_, e)| e.to_json())
-                                .fold(first.to_json(), |acc, s| format!("{},{}", s, acc))
-                        );
-
-                        // spawn a task to send the game state to the client
-                        let fut = {
-                            let connections = connections.clone();
-                            let id = *id;
-
-                            sink.send(OwnedMessage::Text(entities_json))
-                                .and_then(move |sink| {
-                                    // Re-insert the entry to the connections map
-                                    connections.write().unwrap().insert(id, sink);
-                                    Ok(())
-                                })
-                                .map_err(|_| ())
-                        };
-                        tokio::spawn(fut);
-                    }
-
-                    Ok(Loop::Continue(()))
-                })
-        })
-    };
-
-    tokio::runtime::current_thread::block_on_all(
-        conn_handler.select(send_handler).map(|_| ()).map_err(|_| {
-            println!("Error while running core loop");
-        }),
-    )
-    .unwrap_or(());
-
-    Ok(())
-}
-
-fn process_message(id: u32, msg: &OwnedMessage, entities: Arc<RwLock<HashMap<u32, Entity>>>) {
-    if let OwnedMessage::Text(ref txt) = *msg {
-        entities
-            .write()
-            .unwrap()
-            .entry(id)
-            .and_modify(|e| e.process_message(txt));
+            // Client disconnected
+            connections.write().await.remove(&id);
+            entities.write().await.remove(&id);
+            println!("client {} disconnected", id);
+        });
     }
 }

@@ -1,20 +1,20 @@
 use rand::Rng;
-use structopt::StructOpt;
+use clap::Parser;
 
 use rolldice::{multizip, RollResult};
 
-#[derive(StructOpt, Debug)]
-#[structopt(
+#[derive(Parser, Debug)]
+#[command(
     name = "rolldice",
     bin_name = "rolldice",
     about = "Rolls some numbers of 6 sided dice."
 )]
 struct Config {
-    #[structopt(short = "n", help = "Number of dice", default_value = "1")]
+    #[arg(short = 'n', help = "Number of dice", default_value = "1")]
     number_of_dice: u16,
 
-    #[structopt(
-        short = "r",
+    #[arg(
+        short = 'r',
         long = "rowsize",
         help = "Maximum dice per row",
         default_value = "8"
@@ -31,7 +31,7 @@ fn print_row(rolls: &[RollResult]) {
 }
 
 fn main() {
-    let config = Config::from_args();
+    let config = Config::parse();
     if config.dice_per_row == 0 {
         eprintln!("--rowsize must be greater than 0");
         std::process::exit(1);

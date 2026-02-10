@@ -164,9 +164,9 @@ mod tests {
 
     #[test]
     fn test_multizip() {
-        let vecs = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let vecs = [vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
         let iters = vecs.iter().map(|v| v.iter()).collect();
-        let mut zipped = multizip(iters).into_iter();
+        let mut zipped = multizip(iters);
         let line = zipped.next().unwrap();
         assert_eq!(line.as_slice(), &[&1, &4, &7]);
         let line = zipped.next().unwrap();
