@@ -26,8 +26,9 @@ jobs:
             - name: Find all projects
               id: find
               run: |
-                  # Find all directories with Cargo.toml
-                  projects=$(find . -maxdepth 2 -name "Cargo.toml" -type f | sed 's|/Cargo.toml||' | sed 's|^\./||' | jq -R -s -c 'split("\n")[:-1]')
+                  # Find all directories with Cargo.toml (exclude wasm-only projects that can't build natively)
+                  wasm_only="wgpu-game-of-life"
+                  projects=$(find . -maxdepth 2 -name "Cargo.toml" -type f | sed 's|/Cargo.toml||' | sed 's|^\./||' | grep -v "^${wasm_only}$" | jq -R -s -c 'split("\n")[:-1]')
                   echo "all-projects=$projects" >> $GITHUB_OUTPUT
 
                   # For pull requests, try to detect changed projects
@@ -73,11 +74,24 @@ jobs:
               with:
                   components: rust-src
 
-            - name: Install FFmpeg libraries for libavformat-ffi
-              if: matrix.project == 'libavformat-ffi'
+            - name: Install system libraries
+              if: contains(fromJson('["libavformat-ffi","guitar-fretboard","flashcard-app","gpui-calculator"]'), matrix.project)
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libclang-dev
+                  case "${{ matrix.project }}" in
+                    libavformat-ffi)
+                      sudo apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libclang-dev
+                      ;;
+                    guitar-fretboard)
+                      sudo apt-get install -y libasound2-dev
+                      ;;
+                    flashcard-app)
+                      sudo apt-get install -y libfontconfig1-dev
+                      ;;
+                    gpui-calculator)
+                      sudo apt-get install -y libxcb-dev libxkbcommon-dev libxkbcommon-x11-dev
+                      ;;
+                  esac
 
             - name: Cache cargo registry
               uses: actions/cache@v4
