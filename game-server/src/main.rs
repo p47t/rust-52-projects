@@ -73,8 +73,7 @@ async fn main() -> Result<(), Error> {
                     if entities.is_empty() {
                         continue;
                     }
-                    let json_parts: Vec<String> =
-                        entities.values().map(|e| e.to_json()).collect();
+                    let json_parts: Vec<String> = entities.values().map(|e| e.to_json()).collect();
                     format!("[{}]", json_parts.join(","))
                 };
 

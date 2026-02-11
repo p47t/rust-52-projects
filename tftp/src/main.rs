@@ -10,8 +10,12 @@ mod tftp;
 const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:34254";
 
 fn main() -> Result<(), Error> {
-    let command = std::env::args().nth(1).ok_or_else(|| anyhow!("No command"))?;
-    let filename = std::env::args().nth(2).ok_or_else(|| anyhow!("No filename"))?;
+    let command = std::env::args()
+        .nth(1)
+        .ok_or_else(|| anyhow!("No command"))?;
+    let filename = std::env::args()
+        .nth(2)
+        .ok_or_else(|| anyhow!("No filename"))?;
     match command.as_ref() {
         "upload" => {
             Client::new().upload(filename.as_ref(), DEFAULT_SERVER_ADDR)?;

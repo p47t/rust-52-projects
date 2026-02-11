@@ -15,11 +15,11 @@ pub struct StandardBloomFilter<T: ?Sized> {
 
 fn bitmap_size(items_count: usize, fp_rate: f64) -> usize {
     let ln2_2 = core::f64::consts::LN_2 * core::f64::consts::LN_2;
-    ((-1.0f64 * items_count as f64 * fp_rate.ln()) / ln2_2).ceil() as usize
+    (-(items_count as f64 * fp_rate.ln()) / ln2_2).ceil() as usize
 }
 
 fn optimal_k(fp_rate: f64) -> u32 {
-    ((-1.0f64 * fp_rate.ln()) / core::f64::consts::LN_2).ceil() as u32
+    (-fp_rate.ln() / core::f64::consts::LN_2).ceil() as u32
 }
 
 impl<T: ?Sized> StandardBloomFilter<T> {
@@ -31,7 +31,7 @@ impl<T: ?Sized> StandardBloomFilter<T> {
             RandomState::new().build_hasher(),
         ];
         StandardBloomFilter {
-            bitmap: BitVec::from_elem(optimal_m as usize, false),
+            bitmap: BitVec::from_elem(optimal_m, false),
             optimal_m: optimal_m as u64,
             optimal_k,
             hashers,

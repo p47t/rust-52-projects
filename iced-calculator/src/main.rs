@@ -12,6 +12,7 @@ fn main() -> iced::Result {
         .run()
 }
 
+#[derive(Default)]
 struct App {
     input: String,
     result: Option<String>,
@@ -26,17 +27,6 @@ enum Message {
     Backspace,
     Evaluate,
     ToggleSign,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self {
-            input: String::new(),
-            result: None,
-            error: None,
-            engine: Calculator::new(),
-        }
-    }
 }
 
 impl App {

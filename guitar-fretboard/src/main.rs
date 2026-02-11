@@ -1,6 +1,4 @@
-use iced::widget::{
-    button, canvas, column, container, row, stack, text, Canvas, Column, Row,
-};
+use iced::widget::{button, canvas, column, container, row, stack, text, Canvas, Column, Row};
 use iced::{color, Element, Length, Point, Rectangle, Renderer, Size, Theme};
 use rand::Rng;
 use rodio::{OutputStream, Sink, Source};
@@ -14,7 +12,9 @@ fn main() -> iced::Result {
 }
 
 // Music theory constants
-const CHROMATIC_NOTES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const CHROMATIC_NOTES: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
 const C_MAJOR_SCALE: [&str; 7] = ["C", "D", "E", "F", "G", "A", "B"];
 
 // Standard tuning MIDI notes for open strings (string 6 to string 1)
@@ -153,14 +153,10 @@ impl App {
             };
 
             fret_header.push(
-                container(
-                    text(fret_text)
-                        .size(12)
-                        .color(color!(0x7dcfff))
-                )
-                .width(55)
-                .align_x(iced::Alignment::Center)
-                .into()
+                container(text(fret_text).size(12).color(color!(0x7dcfff)))
+                    .width(55)
+                    .align_x(iced::Alignment::Center)
+                    .into(),
             );
         }
 
@@ -223,11 +219,20 @@ impl App {
 
         // Use translucent backgrounds (RGBA with alpha as f32 0.0-1.0)
         let (bg_color, text_color) = if is_root {
-            (iced::Color::from_rgba8(0xff, 0x9e, 0x64, 0.85), color!(0x1a1b26)) // Orange 85%
+            (
+                iced::Color::from_rgba8(0xff, 0x9e, 0x64, 0.85),
+                color!(0x1a1b26),
+            ) // Orange 85%
         } else if is_c_major {
-            (iced::Color::from_rgba8(0x7d, 0xcf, 0xff, 0.60), color!(0x1a1b26)) // Cyan 60% - more transparent
+            (
+                iced::Color::from_rgba8(0x7d, 0xcf, 0xff, 0.60),
+                color!(0x1a1b26),
+            ) // Cyan 60% - more transparent
         } else {
-            (iced::Color::from_rgba8(0x41, 0x48, 0x68, 0.70), color!(0xa9b1d6)) // Dim 70%
+            (
+                iced::Color::from_rgba8(0x41, 0x48, 0x68, 0.70),
+                color!(0xa9b1d6),
+            ) // Dim 70%
         };
 
         let style = move |_theme: &Theme, status: button::Status| {
@@ -257,14 +262,10 @@ impl App {
         };
 
         let circle_button = button(
-            container(
-                text(note_name)
-                    .size(12)
-                    .font(iced::Font {
-                        weight: iced::font::Weight::Bold,
-                        ..iced::Font::default()
-                    })
-            )
+            container(text(note_name).size(12).font(iced::Font {
+                weight: iced::font::Weight::Bold,
+                ..iced::Font::default()
+            }))
             .width(Length::Fill)
             .height(Length::Fill)
             .align_x(iced::Alignment::Center)
@@ -279,7 +280,7 @@ impl App {
         container(circle_button)
             .width(55)
             .align_x(iced::Alignment::Center)
-        .into()
+            .into()
     }
 }
 
@@ -297,8 +298,8 @@ fn midi_to_frequency(midi_note: u8) -> f32 {
 
 /// Karplus-Strong plucked string synthesis for realistic guitar sound
 struct KarplusStrong {
-    buffer: Vec<f32>,         // Circular delay buffer
-    index: usize,             // Current position in buffer
+    buffer: Vec<f32>, // Circular delay buffer
+    index: usize,     // Current position in buffer
     sample_rate: u32,
     samples_remaining: usize, // For duration control
     decay: f32,               // Controls sustain length
@@ -430,9 +431,11 @@ impl canvas::Program<Message> for FretboardCanvas {
         // Double dot at 12th fret - positioned between string rows (B-G and D-A gaps)
         let x12 = fretboard_x + 12.5 * FRET_WIDTH;
         // Gap between row 1 (B) and row 2 (G): at the ROW_SPACING boundary
-        let dot1_y = fretboard_y + 1.0 * (STRING_HEIGHT + ROW_SPACING) + STRING_HEIGHT + ROW_SPACING / 2.0;
+        let dot1_y =
+            fretboard_y + 1.0 * (STRING_HEIGHT + ROW_SPACING) + STRING_HEIGHT + ROW_SPACING / 2.0;
         // Gap between row 3 (D) and row 4 (A)
-        let dot2_y = fretboard_y + 3.0 * (STRING_HEIGHT + ROW_SPACING) + STRING_HEIGHT + ROW_SPACING / 2.0;
+        let dot2_y =
+            fretboard_y + 3.0 * (STRING_HEIGHT + ROW_SPACING) + STRING_HEIGHT + ROW_SPACING / 2.0;
         frame.fill(
             &canvas::Path::circle(Point::new(x12, dot1_y), 5.0),
             canvas::Fill::from(marker_color),
@@ -457,7 +460,9 @@ impl canvas::Program<Message> for FretboardCanvas {
             // Strings are displayed high to low (reversed)
             let display_idx = 5 - string_idx;
             // Account for spacing between rows
-            let y = fretboard_y + display_idx as f32 * (STRING_HEIGHT + ROW_SPACING) + STRING_HEIGHT / 2.0;
+            let y = fretboard_y
+                + display_idx as f32 * (STRING_HEIGHT + ROW_SPACING)
+                + STRING_HEIGHT / 2.0;
             let thickness = string_thicknesses[string_idx];
             let color = string_colors[string_idx];
 

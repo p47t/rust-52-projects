@@ -182,7 +182,7 @@ impl Iterator for TokenStream {
                 '0'..='9' | '.' => {
                     self.offset += self.input[self.offset..]
                         .iter()
-                        .position(|c| !c.is_digit(10) && *c != '.')
+                        .position(|c| !c.is_ascii_digit() && *c != '.')
                         .unwrap_or(0);
                     let number: String = self.input[begin..self.offset].iter().collect();
                     return if let Ok(number) = number.parse::<f64>() {
@@ -202,6 +202,16 @@ impl Iterator for TokenStream {
                 x if x.is_whitespace() => continue,
                 _ => return None,
             }
+        }
+    }
+}
+
+fn main() {
+    for p in std::env::args().skip(1) {
+        println!("Calculating {}", p);
+        let mut calc = Calculator::new(TokenStream::new(&p));
+        for line in calc.calculate() {
+            println!("{}", line);
         }
     }
 }
@@ -264,15 +274,5 @@ mod tests {
         let mut calc = Calculator::new(TokenStream::new("1/0"));
         let lines = calc.calculate();
         assert_eq!(lines, vec!["inf"]);
-    }
-}
-
-fn main() {
-    for p in std::env::args().skip(1) {
-        println!("Calculating {}", p);
-        let mut calc = Calculator::new(TokenStream::new(&p));
-        for line in calc.calculate() {
-            println!("{}", line);
-        }
     }
 }

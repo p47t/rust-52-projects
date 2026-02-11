@@ -25,11 +25,11 @@ struct Command {
 
 impl Command {
     fn execute(&self, cin: Stdio, cout: Stdio) -> Result<Child, Error> {
-        Ok(std::process::Command::new(&self.program)
+        std::process::Command::new(&self.program)
             .stdin(cin)
             .stdout(cout)
             .args(&self.args)
-            .spawn()?)
+            .spawn()
     }
 }
 

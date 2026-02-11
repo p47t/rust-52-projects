@@ -202,8 +202,8 @@ pub fn parse(input: &'_ [u8]) -> IResult<&'_ [u8], (EBMLHeader, EBMLSegment<'_>)
 mod tests {
     use super::*;
 
-    const SINGLE_STREAM: &'static [u8] = include_bytes!("../assets/single_stream.mkv");
-    const WEBM: &'static [u8] = include_bytes!("../assets/big-buck-bunny_trailer.webm");
+    const SINGLE_STREAM: &[u8] = include_bytes!("../assets/single_stream.mkv");
+    const WEBM: &[u8] = include_bytes!("../assets/big-buck-bunny_trailer.webm");
 
     #[test]
     fn test_vint() {
@@ -266,18 +266,18 @@ mod tests {
         let id = vid(&bytes).unwrap().1;
         assert_eq!(id, 0x4286);
 
-        let id = vid(&EBMLHeader::ID).unwrap().1;
+        let id = vid(EBMLHeader::ID).unwrap().1;
         assert_eq!(id, 0x1a45dfa3);
     }
 
     #[test]
     fn test_ebml_header() {
-        let res = parse(&WEBM);
+        let res = parse(WEBM);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "webm");
 
-        let res = parse(&SINGLE_STREAM);
+        let res = parse(SINGLE_STREAM);
         assert!(res.is_ok());
         let (_, (header, _)) = res.unwrap();
         assert_eq!(header.doc_type, "matroska");

@@ -1,5 +1,5 @@
-use rand::Rng;
 use clap::Parser;
+use rand::Rng;
 
 use rolldice::{multizip, RollResult};
 

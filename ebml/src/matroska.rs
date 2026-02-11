@@ -375,11 +375,11 @@ mod tests {
     use super::*;
     use crate::ebml;
 
-    const WEBM: &'static [u8] = include_bytes!("../assets/big-buck-bunny_trailer.webm");
+    const WEBM: &[u8] = include_bytes!("../assets/big-buck-bunny_trailer.webm");
 
     #[test]
     fn test_webm_segment() {
-        let res = ebml::parse(&WEBM[..]);
+        let res = ebml::parse(WEBM);
         assert!(res.is_ok());
         let (_, (_, segment)) = res.unwrap();
 

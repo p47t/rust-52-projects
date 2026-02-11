@@ -72,7 +72,7 @@ jobs:
               if: matrix.project == 'small-os'
               uses: dtolnay/rust-toolchain@nightly
               with:
-                  components: rust-src
+                  components: rust-src, rustfmt, clippy
 
             - name: Install system libraries
               if: contains(fromJson('["libavformat-ffi","guitar-fretboard","flashcard-app","gpui-calculator"]'), matrix.project)
