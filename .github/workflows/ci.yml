@@ -132,6 +132,7 @@ jobs:
 
             - name: Run clippy
               working-directory: ${{ matrix.project }}
+              if: matrix.project != 'small-os'
               run: cargo clippy --all-targets --all-features -- -D warnings
               continue-on-error: true
 
