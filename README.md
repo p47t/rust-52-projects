@@ -27,6 +27,8 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 23. **guitar-fretboard** (2026-02-08) - Guitar fretboard visualizer with audio playback
 24. **flashcard-app** (2026-02-08) - Spaced repetition learning app with Slint UI (desktop + Android)
 25. **wgpu-game-of-life** (2026-02-09) - Conway's Game of Life with WebGPU compute shaders and WASM
+26. **mcp-adb** (2026-02-11) - MCP server for Android Debug Bridge - control Android devices from AI assistants
+27. **media-metadata-explorer** (2026-02-13) - Multimedia metadata inspector with libavformat-powered stream analysis and catalog summaries
 
 ## Build Commands
 
@@ -50,6 +52,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **builder-derive**: Uses trybuild for compile-fail tests
 - **libavformat-ffi**: Requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **flashcard-app**: Android builds require NDK and cargo-apk (`cargo install cargo-apk`)
+- **media-metadata-explorer**: Uses `libavformat-ffi`; requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 
 ## Project Categories
 
@@ -60,11 +63,14 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 **GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
 **Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life
-**Android**: flashcard-app, adb-client
+**Android**: flashcard-app, adb-client, mcp-adb
 **FFI**: libavformat-ffi
+**Multimedia**: media-metadata-explorer, libavformat-ffi, guitar-fretboard
 
 ## Architecture
 
 Each project is completely independent with no shared dependencies. This allows different Rust editions (2018/2021) and dependency versions per project. Any project can be modified or removed without affecting others.
 
 See [CLAUDE.md](CLAUDE.md) for detailed project descriptions and development guidelines.
+
+

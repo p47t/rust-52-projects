@@ -3,6 +3,7 @@
 use crate::bindgen;
 use crate::safe::error::{AvError, Result};
 use crate::safe::packet::Packet;
+use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr;
@@ -40,12 +41,22 @@ pub struct StreamInfo {
     pub media_type: MediaType,
     /// Codec ID
     pub codec_id: u32,
+    /// Codec name (for example `h264` or `aac`)
+    pub codec_name: Option<String>,
     /// Bitrate in bits/second (may be 0 if unknown)
     pub bit_rate: i64,
+    /// For audio: sample rate in Hz
+    pub sample_rate: i32,
+    /// For audio: channel count
+    pub channels: i32,
     /// For video: width in pixels
     pub width: i32,
     /// For video: height in pixels
     pub height: i32,
+    /// Average frame-rate numerator
+    pub avg_frame_rate_num: i32,
+    /// Average frame-rate denominator
+    pub avg_frame_rate_den: i32,
     /// Duration in stream time base units
     pub duration: i64,
     /// Number of frames (may be 0 if unknown)
@@ -54,6 +65,10 @@ pub struct StreamInfo {
     pub time_base_num: i32,
     /// Time base denominator
     pub time_base_den: i32,
+    /// Stream language tag, if present
+    pub language: Option<String>,
+    /// All stream metadata tags
+    pub metadata: BTreeMap<String, String>,
 }
 
 impl StreamInfo {
@@ -63,6 +78,15 @@ impl StreamInfo {
             None
         } else {
             Some(self.duration as f64 * self.time_base_num as f64 / self.time_base_den as f64)
+        }
+    }
+
+    /// Get average frame-rate as frames-per-second, if known.
+    pub fn avg_frame_rate_fps(&self) -> Option<f64> {
+        if self.avg_frame_rate_den == 0 || self.avg_frame_rate_num <= 0 {
+            None
+        } else {
+            Some(self.avg_frame_rate_num as f64 / self.avg_frame_rate_den as f64)
         }
     }
 }
@@ -145,18 +169,38 @@ impl FormatContext {
             let streams = (*self.ptr).streams;
             let stream = *streams.add(index);
             let codecpar = (*stream).codecpar;
+            let metadata = dict_to_map((*stream).metadata);
+            let codec_id = (*codecpar).codec_id;
+
+            let codec_name = if codec_id == bindgen::AVCodecID_AV_CODEC_ID_NONE {
+                None
+            } else {
+                let ptr = bindgen::avcodec_get_name(codec_id);
+                if ptr.is_null() {
+                    None
+                } else {
+                    Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+                }
+            };
 
             Some(StreamInfo {
                 index,
                 media_type: MediaType::from((*codecpar).codec_type),
-                codec_id: (*codecpar).codec_id,
+                codec_id,
+                codec_name,
                 bit_rate: (*codecpar).bit_rate,
+                sample_rate: (*codecpar).sample_rate,
+                channels: (*codecpar).channels,
                 width: (*codecpar).width,
                 height: (*codecpar).height,
+                avg_frame_rate_num: (*stream).avg_frame_rate.num,
+                avg_frame_rate_den: (*stream).avg_frame_rate.den,
                 duration: (*stream).duration,
                 nb_frames: (*stream).nb_frames,
                 time_base_num: (*stream).time_base.num,
                 time_base_den: (*stream).time_base.den,
+                language: metadata.get("language").cloned(),
+                metadata,
             })
         }
     }
@@ -175,6 +219,38 @@ impl FormatContext {
     pub fn duration_secs(&self) -> Option<f64> {
         // AV_TIME_BASE is 1000000
         self.duration().map(|d| d as f64 / 1_000_000.0)
+    }
+
+    /// Get total container bit-rate in bits/second, or None if unknown.
+    pub fn bit_rate(&self) -> Option<i64> {
+        let bit_rate = unsafe { (*self.ptr).bit_rate };
+        if bit_rate <= 0 {
+            None
+        } else {
+            Some(bit_rate)
+        }
+    }
+
+    /// Get container size in bytes, or None if unavailable.
+    pub fn size_bytes(&self) -> Option<i64> {
+        unsafe {
+            let pb = (*self.ptr).pb;
+            if pb.is_null() {
+                return None;
+            }
+
+            let size = bindgen::avio_size(pb);
+            if size < 0 {
+                None
+            } else {
+                Some(size)
+            }
+        }
+    }
+
+    /// Get container-level metadata tags.
+    pub fn metadata(&self) -> BTreeMap<String, String> {
+        unsafe { dict_to_map((*self.ptr).metadata) }
     }
 
     /// Get the container format name.
@@ -245,6 +321,36 @@ impl Drop for FormatContext {
             }
         }
     }
+}
+
+unsafe fn dict_to_map(dict: *mut bindgen::AVDictionary) -> BTreeMap<String, String> {
+    let mut tags = BTreeMap::new();
+    if dict.is_null() {
+        return tags;
+    }
+
+    let empty = b"\0";
+    let mut entry: *mut bindgen::AVDictionaryEntry = ptr::null_mut();
+
+    loop {
+        // AV_DICT_IGNORE_SUFFIX = 2
+        entry = bindgen::av_dict_get(dict, empty.as_ptr() as *const i8, entry, 2);
+        if entry.is_null() {
+            break;
+        }
+
+        let key_ptr = (*entry).key;
+        let value_ptr = (*entry).value;
+        if key_ptr.is_null() || value_ptr.is_null() {
+            continue;
+        }
+
+        let key = CStr::from_ptr(key_ptr).to_string_lossy().into_owned();
+        let value = CStr::from_ptr(value_ptr).to_string_lossy().into_owned();
+        tags.insert(key, value);
+    }
+
+    tags
 }
 
 // FormatContext is not Send/Sync by default due to raw pointer

@@ -41,12 +41,18 @@ fn main() {
         .allowlist_function("av_strerror")
         .allowlist_function("avformat_version")
         .allowlist_function("av_dump_format")
+        .allowlist_function("avcodec_get_name")
+        .allowlist_function("av_dict_get")
+        .allowlist_function("avio_size")
         // Allowlist types
         .allowlist_type("AVFormatContext")
         .allowlist_type("AVPacket")
         .allowlist_type("AVStream")
         .allowlist_type("AVCodecParameters")
         .allowlist_type("AVMediaType")
+        .allowlist_type("AVDictionary")
+        .allowlist_type("AVDictionaryEntry")
+        .allowlist_type("AVIOContext")
         .allowlist_type("AVRational")
         // Allowlist constants
         .allowlist_var("AVMEDIA_TYPE_.*")

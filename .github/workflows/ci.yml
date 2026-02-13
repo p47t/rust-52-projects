@@ -75,11 +75,14 @@ jobs:
                   components: rust-src, rustfmt, clippy
 
             - name: Install system libraries
-              if: contains(fromJson('["libavformat-ffi","guitar-fretboard","flashcard-app","gpui-calculator"]'), matrix.project)
+              if: contains(fromJson('["libavformat-ffi","media-metadata-explorer","guitar-fretboard","flashcard-app","gpui-calculator"]'), matrix.project)
               run: |
                   sudo apt-get update
                   case "${{ matrix.project }}" in
                     libavformat-ffi)
+                      sudo apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libclang-dev
+                      ;;
+                    media-metadata-explorer)
                       sudo apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libclang-dev
                       ;;
                     guitar-fretboard)
