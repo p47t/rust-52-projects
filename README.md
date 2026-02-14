@@ -30,6 +30,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 26. **mcp-adb** (2026-02-11) - MCP server for Android Debug Bridge - control Android devices from AI assistants
 27. **media-metadata-explorer** (2026-02-13) - Multimedia metadata inspector with libavformat-powered stream analysis and catalog summaries
 28. **tilesplit** (2026-02-13) - tile splitter with Ultra HDR gain map support
+29. **tilesplit-wasm** (2026-02-14) - Browser-based image tile splitter with Ultra HDR gain map support (WASM)
 
 ## Build Commands
 
@@ -54,6 +55,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **libavformat-ffi**: Requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **flashcard-app**: Android builds require NDK and cargo-apk (`cargo install cargo-apk`)
 - **media-metadata-explorer**: Uses `libavformat-ffi`; requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
+- **tilesplit-wasm**: Build with `wasm-pack build --target web`
 
 ## Project Categories
 
@@ -63,7 +65,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 **Utilities**: calculator, count-words, rolldice, plum
 **GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
-**Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life
+**Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life, tilesplit-wasm
 **Android**: flashcard-app, adb-client, mcp-adb
 **FFI**: libavformat-ffi
 **Multimedia**: media-metadata-explorer, libavformat-ffi, guitar-fretboard
@@ -73,5 +75,3 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 Each project is completely independent with no shared dependencies. This allows different Rust editions (2018/2021) and dependency versions per project. Any project can be modified or removed without affecting others.
 
 See [CLAUDE.md](CLAUDE.md) for detailed project descriptions and development guidelines.
-
-

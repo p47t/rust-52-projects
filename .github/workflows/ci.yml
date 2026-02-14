@@ -27,8 +27,8 @@ jobs:
               id: find
               run: |
                   # Find all directories with Cargo.toml (exclude wasm-only projects that can't build natively)
-                  wasm_only="wgpu-game-of-life"
-                  projects=$(find . -maxdepth 2 -name "Cargo.toml" -type f | sed 's|/Cargo.toml||' | sed 's|^\./||' | grep -v "^${wasm_only}$" | jq -R -s -c 'split("\n")[:-1]')
+                  wasm_only="wgpu-game-of-life|tilesplit-wasm"
+                  projects=$(find . -maxdepth 2 -name "Cargo.toml" -type f | sed 's|/Cargo.toml||' | sed 's|^\./||' | grep -vE "^(${wasm_only})$" | jq -R -s -c 'split("\n")[:-1]')
                   echo "all-projects=$projects" >> $GITHUB_OUTPUT
 
                   # For pull requests, try to detect changed projects
