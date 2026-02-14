@@ -29,6 +29,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 25. **wgpu-game-of-life** (2026-02-09) - Conway's Game of Life with WebGPU compute shaders and WASM
 26. **mcp-adb** (2026-02-11) - MCP server for Android Debug Bridge - control Android devices from AI assistants
 27. **media-metadata-explorer** (2026-02-13) - Multimedia metadata inspector with libavformat-powered stream analysis and catalog summaries
+28. **tilesplit** (2026-02-13) - tile splitter with Ultra HDR gain map support
 
 ## Build Commands
 

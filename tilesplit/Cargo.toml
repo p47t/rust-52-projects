@@ -1,0 +1,9 @@
+[package]
+name = "tilesplit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+image = { version = "0.25.5", default-features = true, features = ["jpeg", "png"] }
+jpegli = { version = "0.10.1", package = "jpegli-rs" }
+ultrahdr = { version = "0.1.1", package = "ultrahdr-rs" }
