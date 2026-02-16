@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 
 use image::DynamicImage;
 use image::codecs::jpeg::JpegEncoder;
-use jpegli::decoder::{Decoder as JpegDecoder, PixelFormat as JpegPixelFormat, PreserveConfig};
+use jpegli::decoder::{
+    Decoder as JpegDecoder, PixelFormat as JpegPixelFormat, PreserveConfig, StandardProfile,
+};
 use jpegli::encoder::{ChromaSubsampling, EncoderConfig, PixelLayout, Unstoppable};
 #[cfg(test)]
 use ultrahdr::Encoder as UltraHdrEncoder;
@@ -237,6 +239,23 @@ fn is_close(a: f64, b: f64) -> bool {
     (a - b).abs() <= ASPECT_TOLERANCE
 }
 
+fn gamut_from_standard_profile(profile: Option<StandardProfile>) -> ColorGamut {
+    match profile {
+        Some(StandardProfile::DisplayP3) => ColorGamut::DisplayP3,
+        _ => ColorGamut::Bt709,
+    }
+}
+
+fn gamut_from_icc_bytes(icc: &[u8]) -> ColorGamut {
+    // Display P3 profiles contain the "Display P3" description.
+    // This is a lightweight heuristic for when we don't have jpegli's StandardProfile detection.
+    if icc.windows(10).any(|w| w == b"Display P3") {
+        ColorGamut::DisplayP3
+    } else {
+        ColorGamut::Bt709
+    }
+}
+
 fn is_jpeg_path(path: &str) -> bool {
     let extension = Path::new(path)
         .extension()
@@ -315,7 +334,132 @@ fn save_image(img: &DynamicImage, path: &str) -> Result<(), i32> {
     img.save(path).map_err(|_| EXIT_IO_ERROR)
 }
 
+fn encode_sdr_tile_jpegli(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    bytes_per_pixel: usize,
+    icc_profile: Option<&[u8]>,
+) -> Result<Vec<u8>, i32> {
+    let (layout, data): (PixelLayout, std::borrow::Cow<[u8]>) = match bytes_per_pixel {
+        3 => (PixelLayout::Rgb8Srgb, std::borrow::Cow::Borrowed(pixels)),
+        4 => {
+            let rgb: Vec<u8> = pixels
+                .chunks_exact(4)
+                .flat_map(|rgba| [rgba[0], rgba[1], rgba[2]])
+                .collect();
+            (PixelLayout::Rgb8Srgb, std::borrow::Cow::Owned(rgb))
+        }
+        _ => return Err(EXIT_IO_ERROR),
+    };
+
+    let mut config = EncoderConfig::ycbcr(SDR_TILE_JPEG_QUALITY, ChromaSubsampling::None);
+    if let Some(icc) = icc_profile
+        && !icc.is_empty()
+    {
+        config = config.icc_profile(icc.to_vec());
+    }
+
+    let mut encoder = config
+        .encode_from_bytes(width, height, layout)
+        .map_err(|_| EXIT_IO_ERROR)?;
+    encoder
+        .push_packed(&data, Unstoppable)
+        .map_err(|_| EXIT_IO_ERROR)?;
+    encoder.finish().map_err(|_| EXIT_IO_ERROR)
+}
+
+fn crop_jpegli_pixels(
+    pixels: &[u8],
+    src_width: u32,
+    src_height: u32,
+    bytes_per_pixel: usize,
+    rect: Rect,
+) -> Result<Vec<u8>, i32> {
+    let x_end = rect.x.saturating_add(rect.width);
+    let y_end = rect.y.saturating_add(rect.height);
+    if x_end > src_width || y_end > src_height || rect.width == 0 || rect.height == 0 {
+        return Err(EXIT_INVALID_CROP);
+    }
+
+    let src_stride = (src_width as usize)
+        .checked_mul(bytes_per_pixel)
+        .ok_or(EXIT_IO_ERROR)?;
+    let row_len = (rect.width as usize)
+        .checked_mul(bytes_per_pixel)
+        .ok_or(EXIT_IO_ERROR)?;
+    let out_len = row_len
+        .checked_mul(rect.height as usize)
+        .ok_or(EXIT_IO_ERROR)?;
+    let mut out = vec![0u8; out_len];
+
+    for row in 0..rect.height as usize {
+        let src_y = rect.y as usize + row;
+        let src_off = src_y * src_stride + rect.x as usize * bytes_per_pixel;
+        let dst_off = row * row_len;
+        out[dst_off..dst_off + row_len].copy_from_slice(&pixels[src_off..src_off + row_len]);
+    }
+
+    Ok(out)
+}
+
+fn split_standard_jpeg(args: &SplitParams) -> Result<(), i32> {
+    let source_bytes = fs::read(&args.input).map_err(|_| EXIT_IO_ERROR)?;
+
+    let decoded = catch_unwind_quiet(AssertUnwindSafe(|| {
+        JpegDecoder::new()
+            .preserve(PreserveConfig::default())
+            .output_format(JpegPixelFormat::Rgb)
+            .decode(&source_bytes)
+    }))
+    .map_err(|_| EXIT_IO_ERROR)?
+    .map_err(|_| EXIT_IO_ERROR)?;
+
+    let bpp = decoded.bytes_per_pixel();
+    let icc_profile = decoded
+        .extras()
+        .and_then(|e| e.icc_profile().map(|icc| icc.to_vec()));
+
+    let (left_rect, right_rect) = compute_split_rectangles(decoded.width, decoded.height)?;
+
+    let left_pixels =
+        crop_jpegli_pixels(&decoded.data, decoded.width, decoded.height, bpp, left_rect)?;
+    let right_pixels =
+        crop_jpegli_pixels(&decoded.data, decoded.width, decoded.height, bpp, right_rect)?;
+
+    let left_bytes = encode_sdr_tile_jpegli(
+        &left_pixels,
+        left_rect.width,
+        left_rect.height,
+        bpp,
+        icc_profile.as_deref(),
+    )?;
+    let right_bytes = encode_sdr_tile_jpegli(
+        &right_pixels,
+        right_rect.width,
+        right_rect.height,
+        bpp,
+        icc_profile.as_deref(),
+    )?;
+
+    fs::write(&args.left_output, left_bytes).map_err(|_| EXIT_IO_ERROR)?;
+    fs::write(&args.right_output, right_bytes).map_err(|_| EXIT_IO_ERROR)?;
+
+    Ok(())
+}
+
 fn split_standard_image(args: &SplitParams) -> Result<(), i32> {
+    // For JPEG inputs, use jpegli to preserve ICC profiles and encode at high quality.
+    if is_jpeg_path(&args.input) {
+        if let Ok(()) = split_standard_jpeg(args) {
+            return Ok(());
+        }
+        debug_log(
+            args.debug,
+            "Standard split: jpegli JPEG path failed, falling back to image crate",
+        );
+    }
+
     let image = image::open(&args.input).map_err(|_| EXIT_IO_ERROR)?;
     let (left_rect, right_rect) = compute_split_rectangles(image.width(), image.height())?;
 
@@ -503,8 +647,11 @@ fn crop_gainmap(source: &GainMap, rect: Rect) -> Result<GainMap, i32> {
     })
 }
 
-fn encode_gainmap_jpeg(gainmap: &GainMap) -> Result<Vec<u8>, i32> {
-    match gainmap.channels {
+fn encode_gainmap_jpeg(
+    gainmap: &GainMap,
+    metadata: &ultrahdr::GainMapMetadata,
+) -> Result<Vec<u8>, i32> {
+    let raw_jpeg = match gainmap.channels {
         1 => {
             let config = EncoderConfig::grayscale(GAINMAP_JPEG_QUALITY);
             let mut encoder = config
@@ -513,7 +660,7 @@ fn encode_gainmap_jpeg(gainmap: &GainMap) -> Result<Vec<u8>, i32> {
             encoder
                 .push_packed(&gainmap.data, Unstoppable)
                 .map_err(|_| EXIT_IO_ERROR)?;
-            encoder.finish().map_err(|_| EXIT_IO_ERROR)
+            encoder.finish().map_err(|_| EXIT_IO_ERROR)?
         }
         3 => {
             let config = EncoderConfig::ycbcr(GAINMAP_JPEG_QUALITY, ChromaSubsampling::None);
@@ -523,10 +670,19 @@ fn encode_gainmap_jpeg(gainmap: &GainMap) -> Result<Vec<u8>, i32> {
             encoder
                 .push_packed(&gainmap.data, Unstoppable)
                 .map_err(|_| EXIT_IO_ERROR)?;
-            encoder.finish().map_err(|_| EXIT_IO_ERROR)
+            encoder.finish().map_err(|_| EXIT_IO_ERROR)?
         }
-        _ => Err(EXIT_IO_ERROR),
-    }
+        _ => return Err(EXIT_IO_ERROR),
+    };
+
+    // Embed gain map metadata XMP into the gainmap JPEG (insert APP1 after SOI)
+    let xmp = generate_gainmap_xmp(metadata);
+    let xmp_marker = ultrahdr::metadata::xmp::create_xmp_app1_marker(&xmp);
+    let mut output = Vec::with_capacity(raw_jpeg.len() + xmp_marker.len());
+    output.extend_from_slice(&raw_jpeg[..2]); // SOI
+    output.extend_from_slice(&xmp_marker);
+    output.extend_from_slice(&raw_jpeg[2..]);
+    Ok(output)
 }
 
 fn luminance_coefficients(gamut: ColorGamut) -> (f32, f32, f32) {
@@ -842,10 +998,11 @@ fn try_extract_ultrahdr_with_jpegli(
         }
     };
 
-    let (metadata, gainmap_jpeg, icc_profile): (
+    let (metadata, gainmap_jpeg, icc_profile, detected_gamut): (
         ultrahdr::GainMapMetadata,
         Vec<u8>,
         Option<Vec<u8>>,
+        ColorGamut,
     ) = {
         let extras = match decoded.extras() {
             Some(extras) => extras,
@@ -895,21 +1052,25 @@ fn try_extract_ultrahdr_with_jpegli(
         };
         debug_log_metadata(debug, "HDR probe: selected metadata", &metadata);
 
+        let detected_gamut = gamut_from_standard_profile(extras.icc_is_standard());
         let icc_profile = extras.icc_profile().map(|icc| icc.to_vec());
-        (metadata, gainmap, icc_profile)
+        (metadata, gainmap, icc_profile, detected_gamut)
     };
-    debug_log(debug, "HDR probe: jpegli found XMP + gainmap");
+    debug_log(
+        debug,
+        &format!("HDR probe: jpegli found XMP + gainmap, gamut={detected_gamut:?}"),
+    );
 
     let sdr = RawImage::from_data(
         decoded.width,
         decoded.height,
         PixelFormat::Rgb8,
-        ColorGamut::Bt709,
+        detected_gamut,
         ColorTransfer::Srgb,
         decoded.data,
     )
     .ok()?;
-    let gainmap = match decode_gainmap_jpeg(&gainmap_jpeg, ColorGamut::Bt709) {
+    let gainmap = match decode_gainmap_jpeg(&gainmap_jpeg, detected_gamut) {
         Ok(gainmap) => gainmap,
         Err(_) => {
             debug_log(debug, "HDR probe: gainmap JPEG decode failed");
@@ -983,6 +1144,30 @@ fn try_extract_ultrahdr_with_ultrahdr_decoder(
     let icc_profile = catch_unwind_quiet(AssertUnwindSafe(|| decoder.icc_profile()))
         .ok()
         .flatten();
+
+    // The ultrahdr-rs decoder defaults SDR to Bt709; detect actual gamut from ICC.
+    let detected_gamut = match &icc_profile {
+        Some(icc) => gamut_from_icc_bytes(icc),
+        None => ColorGamut::Bt709,
+    };
+    let sdr = if sdr.gamut != detected_gamut {
+        debug_log(
+            debug,
+            &format!("HDR probe: overriding SDR gamut to {detected_gamut:?}"),
+        );
+        RawImage::from_data(
+            sdr.width,
+            sdr.height,
+            sdr.format,
+            detected_gamut,
+            sdr.transfer,
+            sdr.data,
+        )
+        .ok()?
+    } else {
+        sdr
+    };
+
     debug_log(debug, "HDR probe: ultrahdr-rs path success");
 
     Some((metadata, sdr, gainmap, icc_profile))
@@ -1060,18 +1245,277 @@ fn split_ultrahdr_tiles(
     Ok(())
 }
 
+/// Format a 3-element value for XMP: log2 if `use_log2`, then either scalar or `rdf:Seq`.
+fn format_xmp_value(values: &[f32; 3], is_single: bool, use_log2: bool) -> String {
+    let v: [f32; 3] = if use_log2 {
+        [values[0].log2(), values[1].log2(), values[2].log2()]
+    } else {
+        *values
+    };
+    if is_single {
+        format!("{:.6}", v[0])
+    } else {
+        format!("{:.6}, {:.6}, {:.6}", v[0], v[1], v[2])
+    }
+}
+
+/// Format a 3-element value as an rdf:Seq block for XMP per-channel properties.
+fn format_xmp_seq(tag: &str, values: &[f32; 3], is_single: bool, use_log2: bool) -> String {
+    let v: [f32; 3] = if use_log2 {
+        [values[0].log2(), values[1].log2(), values[2].log2()]
+    } else {
+        *values
+    };
+    if is_single {
+        // Single channel: use attribute form
+        format!("        hdrgm:{tag}=\"{:.6}\"", v[0])
+    } else {
+        // Per-channel: use rdf:Seq
+        format!(
+            "        <hdrgm:{tag}>\n          \
+             <rdf:Seq>\n            \
+             <rdf:li>{:.6}</rdf:li>\n            \
+             <rdf:li>{:.6}</rdf:li>\n            \
+             <rdf:li>{:.6}</rdf:li>\n          \
+             </rdf:Seq>\n        \
+             </hdrgm:{tag}>",
+            v[0], v[1], v[2]
+        )
+    }
+}
+
+/// Generate XMP for the primary JPEG with Container directory and proper rdf:Seq format.
+fn generate_primary_xmp(metadata: &ultrahdr::GainMapMetadata, gainmap_length: usize) -> String {
+    let is_single = metadata.is_single_channel();
+    let hdr_capacity_min = metadata.hdr_capacity_min.log2();
+    let hdr_capacity_max = metadata.hdr_capacity_max.log2();
+
+    let gain_map_min = format_xmp_seq("GainMapMin", &metadata.min_content_boost, is_single, true);
+    let gain_map_max = format_xmp_seq("GainMapMax", &metadata.max_content_boost, is_single, true);
+    let gamma = format_xmp_seq("Gamma", &metadata.gamma, is_single, false);
+    let offset_sdr = format_xmp_value(&metadata.offset_sdr, is_single, false);
+    let offset_hdr = format_xmp_value(&metadata.offset_hdr, is_single, false);
+
+    format!(
+        r#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+        xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"
+        xmlns:Container="http://ns.google.com/photos/1.0/container/"
+        xmlns:Item="http://ns.google.com/photos/1.0/container/item/"
+        hdrgm:Version="1.0"
+        hdrgm:OffsetSDR="{offset_sdr}"
+        hdrgm:OffsetHDR="{offset_hdr}"
+        hdrgm:HDRCapacityMin="{hdr_capacity_min:.6}"
+        hdrgm:HDRCapacityMax="{hdr_capacity_max:.6}"
+        hdrgm:BaseRenditionIsHDR="False">
+{gain_map_min}
+{gain_map_max}
+{gamma}
+      <Container:Directory>
+        <rdf:Seq>
+          <rdf:li rdf:parseType="Resource">
+            <Container:Item
+                Item:Semantic="Primary"
+                Item:Mime="image/jpeg"/>
+          </rdf:li>
+          <rdf:li rdf:parseType="Resource">
+            <Container:Item
+                Item:Semantic="GainMap"
+                Item:Mime="image/jpeg"
+                Item:Length="{gainmap_length}"/>
+          </rdf:li>
+        </rdf:Seq>
+      </Container:Directory>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#
+    )
+}
+
+/// Generate XMP for the gainmap JPEG (no Container directory).
+fn generate_gainmap_xmp(metadata: &ultrahdr::GainMapMetadata) -> String {
+    let is_single = metadata.is_single_channel();
+    let hdr_capacity_min = metadata.hdr_capacity_min.log2();
+    let hdr_capacity_max = metadata.hdr_capacity_max.log2();
+
+    let gain_map_min = format_xmp_seq("GainMapMin", &metadata.min_content_boost, is_single, true);
+    let gain_map_max = format_xmp_seq("GainMapMax", &metadata.max_content_boost, is_single, true);
+    let gamma = format_xmp_seq("Gamma", &metadata.gamma, is_single, false);
+    let offset_sdr = format_xmp_value(&metadata.offset_sdr, is_single, false);
+    let offset_hdr = format_xmp_value(&metadata.offset_hdr, is_single, false);
+
+    format!(
+        r#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+        xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"
+        hdrgm:Version="1.0"
+        hdrgm:BaseRenditionIsHDR="False"
+        hdrgm:HDRCapacityMin="{hdr_capacity_min:.6}"
+        hdrgm:HDRCapacityMax="{hdr_capacity_max:.6}"
+        hdrgm:OffsetSDR="{offset_sdr}"
+        hdrgm:OffsetHDR="{offset_hdr}">
+{gain_map_min}
+{gain_map_max}
+{gamma}
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#
+    )
+}
+
+/// Find the position after SOI and APP0/APP1/APP2 markers where MPF APP2 should be inserted.
+fn find_mpf_insert_position(data: &[u8]) -> Result<usize, i32> {
+    if data.len() < 4 || data[0] != 0xFF || data[1] != 0xD8 {
+        return Err(EXIT_IO_ERROR);
+    }
+    let mut pos = 2;
+    while pos + 3 < data.len() {
+        if data[pos] != 0xFF {
+            break;
+        }
+        let marker = data[pos + 1];
+        // Stop before non-APP markers; MPF goes after all existing APP markers
+        if !(0xE0..=0xEF).contains(&marker) {
+            break;
+        }
+        let length = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
+        pos += 2 + length;
+    }
+    Ok(pos)
+}
+
+/// Create an MPF APP2 marker for a two-image Ultra HDR JPEG.
+///
+/// `primary_size` is the total byte size of the final primary JPEG (including the MPF marker).
+/// `gainmap_size` is the byte size of the gainmap JPEG.
+/// `mpf_marker_offset` is the byte offset of the MPF marker within the final primary JPEG.
+///
+/// Per the MPF spec, secondary image offsets are relative to the start of the MPF's
+/// TIFF header, which is 8 bytes after the MPF marker start (FF E2 + length(2) + "MPF\0"(4)).
+fn create_mpf_app2(
+    primary_size: u32,
+    gainmap_size: u32,
+    mpf_marker_offset: usize,
+) -> Vec<u8> {
+    let num_images: u32 = 2;
+    let mut mpf_data = Vec::with_capacity(128);
+
+    // TIFF header: big-endian
+    mpf_data.extend_from_slice(b"MM");
+    mpf_data.extend_from_slice(&0x002Au16.to_be_bytes());
+    mpf_data.extend_from_slice(&8u32.to_be_bytes()); // IFD offset
+
+    // IFD: 3 entries
+    mpf_data.extend_from_slice(&3u16.to_be_bytes());
+
+    // Entry 1: Version (0xB000), UNDEFINED(7), count=4, value="0100"
+    mpf_data.extend_from_slice(&0xB000u16.to_be_bytes());
+    mpf_data.extend_from_slice(&7u16.to_be_bytes());
+    mpf_data.extend_from_slice(&4u32.to_be_bytes());
+    mpf_data.extend_from_slice(b"0100");
+
+    // Entry 2: NumberOfImages (0xB001), LONG(4), count=1
+    mpf_data.extend_from_slice(&0xB001u16.to_be_bytes());
+    mpf_data.extend_from_slice(&4u16.to_be_bytes());
+    mpf_data.extend_from_slice(&1u32.to_be_bytes());
+    mpf_data.extend_from_slice(&num_images.to_be_bytes());
+
+    // Entry 3: MPEntry (0xB002), UNDEFINED(7), count=num_images*16
+    let mp_entry_size = num_images * 16;
+    // MP entry data offset: 8 (TIFF hdr) + 2 (num_entries) + 36 (3*12 IFD entries) + 4 (next IFD)
+    let mp_entry_offset: u32 = 8 + 2 + 36 + 4;
+    mpf_data.extend_from_slice(&0xB002u16.to_be_bytes());
+    mpf_data.extend_from_slice(&7u16.to_be_bytes());
+    mpf_data.extend_from_slice(&mp_entry_size.to_be_bytes());
+    mpf_data.extend_from_slice(&mp_entry_offset.to_be_bytes());
+
+    // Next IFD offset: 0 (none)
+    mpf_data.extend_from_slice(&0u32.to_be_bytes());
+
+    // MP Entry for primary image (attr=0x030000, size=primary_size, offset=0)
+    mpf_data.extend_from_slice(&0x0003_0000u32.to_be_bytes());
+    mpf_data.extend_from_slice(&primary_size.to_be_bytes());
+    mpf_data.extend_from_slice(&0u32.to_be_bytes());
+    mpf_data.extend_from_slice(&0u32.to_be_bytes());
+
+    // MP Entry for gainmap image
+    // Offset is relative to the TIFF header, which is at mpf_marker_offset + 8
+    let tiff_header_offset = mpf_marker_offset as u32 + 8;
+    let relative_offset = primary_size - tiff_header_offset;
+    mpf_data.extend_from_slice(&0u32.to_be_bytes()); // attribute: dependent
+    mpf_data.extend_from_slice(&gainmap_size.to_be_bytes());
+    mpf_data.extend_from_slice(&relative_offset.to_be_bytes());
+    mpf_data.extend_from_slice(&0u32.to_be_bytes());
+
+    // Wrap in APP2 marker
+    let payload_len = 2 + 4 + mpf_data.len(); // length field + "MPF\0" + data
+    let mut marker = Vec::with_capacity(2 + payload_len);
+    marker.push(0xFF);
+    marker.push(0xE2);
+    marker.push(((payload_len >> 8) & 0xFF) as u8);
+    marker.push((payload_len & 0xFF) as u8);
+    marker.extend_from_slice(b"MPF\0");
+    marker.extend_from_slice(&mpf_data);
+    marker
+}
+
+/// Assemble a complete Ultra HDR JPEG from SDR primary + gainmap + XMP metadata + MPF.
+fn assemble_ultrahdr_jpeg(
+    sdr_jpeg: &[u8],
+    gainmap_jpeg: &[u8],
+    metadata: &ultrahdr::GainMapMetadata,
+) -> Result<Vec<u8>, i32> {
+    let xmp = generate_primary_xmp(metadata, gainmap_jpeg.len());
+    let xmp_marker = ultrahdr::metadata::xmp::create_xmp_app1_marker(&xmp);
+
+    // Insert XMP APP1 after SOI
+    let mut primary_with_xmp = Vec::with_capacity(sdr_jpeg.len() + xmp_marker.len());
+    primary_with_xmp.extend_from_slice(&sdr_jpeg[..2]); // SOI
+    primary_with_xmp.extend_from_slice(&xmp_marker);
+    primary_with_xmp.extend_from_slice(&sdr_jpeg[2..]);
+
+    // Find where to insert MPF APP2 (after all existing APP markers)
+    let insert_pos = find_mpf_insert_position(&primary_with_xmp)?;
+
+    // Create a placeholder MPF to determine its size (use u32::MAX to avoid underflow)
+    let placeholder_mpf = create_mpf_app2(u32::MAX, gainmap_jpeg.len() as u32, insert_pos);
+    let mpf_size = placeholder_mpf.len();
+
+    // Final primary size includes the MPF marker
+    let primary_final_size = (primary_with_xmp.len() + mpf_size) as u32;
+    let mpf_marker = create_mpf_app2(
+        primary_final_size,
+        gainmap_jpeg.len() as u32,
+        insert_pos,
+    );
+
+    // Assemble: primary[..insert] + MPF + primary[insert..] + gainmap
+    let total = primary_with_xmp.len() + mpf_marker.len() + gainmap_jpeg.len();
+    let mut output = Vec::with_capacity(total);
+    output.extend_from_slice(&primary_with_xmp[..insert_pos]);
+    output.extend_from_slice(&mpf_marker);
+    output.extend_from_slice(&primary_with_xmp[insert_pos..]);
+    output.extend_from_slice(gainmap_jpeg);
+
+    Ok(output)
+}
+
 fn encode_ultrahdr_tile(
     sdr_tile: RawImage,
     gainmap_tile: GainMap,
     metadata: &ultrahdr::GainMapMetadata,
     source_icc_profile: Option<&[u8]>,
 ) -> Result<Vec<u8>, i32> {
-    let gainmap_jpeg = encode_gainmap_jpeg(&gainmap_tile)?;
-    let xmp = ultrahdr::metadata::xmp::generate_xmp(metadata, gainmap_jpeg.len());
+    let gainmap_jpeg = encode_gainmap_jpeg(&gainmap_tile, metadata)?;
 
-    let mut config = EncoderConfig::ycbcr(SDR_TILE_JPEG_QUALITY, ChromaSubsampling::None)
-        .xmp(xmp.into_bytes())
-        .add_gainmap(gainmap_jpeg);
+    // Encode SDR tile (without gainmap — we assemble the container ourselves for correct MPF offsets)
+    let mut config = EncoderConfig::ycbcr(SDR_TILE_JPEG_QUALITY, ChromaSubsampling::None);
     if let Some(icc_profile) = source_icc_profile
         && !icc_profile.is_empty()
     {
@@ -1100,7 +1544,9 @@ fn encode_ultrahdr_tile(
     encoder
         .push_packed(&pixel_data, Unstoppable)
         .map_err(|_| EXIT_IO_ERROR)?;
-    encoder.finish().map_err(|_| EXIT_IO_ERROR)
+    let sdr_jpeg = encoder.finish().map_err(|_| EXIT_IO_ERROR)?;
+
+    assemble_ultrahdr_jpeg(&sdr_jpeg, &gainmap_jpeg, metadata)
 }
 
 fn try_split_ultrahdr_jpeg(args: &SplitParams) -> Result<UltraHdrSplitOutcome, i32> {
@@ -1157,10 +1603,17 @@ pub fn run(args: SplitParams) -> Result<(), i32> {
                 args.debug,
                 "Run: fallback to standard split (not Ultra HDR)",
             );
+            if is_jpeg_path(&args.input) {
+                eprintln!(
+                    "Warning: input is not Ultra HDR; output will be SDR (no HDR gain map)"
+                );
+            }
             split_standard_image(&args)
         }
         Err(EXIT_IO_ERROR) => {
-            debug_log(args.debug, "Run: fallback to standard split (HDR IO error)");
+            eprintln!(
+                "Warning: HDR extraction failed; falling back to SDR output (brightness may be reduced)"
+            );
             split_standard_image(&args)
         }
         Err(code) => {
@@ -1229,17 +1682,6 @@ mod tests {
         }
 
         let sdr_jpeg = encode_rgb_jpeg(width, height, &rgb, 90.0);
-        let gainmap_width = (width / 4).max(1);
-        let gainmap_height = (height / 4).max(1);
-        let gainmap_data = vec![128u8; (gainmap_width * gainmap_height) as usize];
-        let gainmap = GainMap {
-            width: gainmap_width,
-            height: gainmap_height,
-            channels: 1,
-            data: gainmap_data,
-        };
-        let gainmap_jpeg = encode_gainmap_jpeg(&gainmap).expect("gainmap jpeg");
-
         let metadata = ultrahdr::GainMapMetadata {
             max_content_boost: [4.0, 4.0, 4.0],
             min_content_boost: [1.0, 1.0, 1.0],
@@ -1250,6 +1692,17 @@ mod tests {
             hdr_capacity_max: 4.0,
             use_base_color_space: false,
         };
+
+        let gainmap_width = (width / 4).max(1);
+        let gainmap_height = (height / 4).max(1);
+        let gainmap_data = vec![128u8; (gainmap_width * gainmap_height) as usize];
+        let gainmap = GainMap {
+            width: gainmap_width,
+            height: gainmap_height,
+            channels: 1,
+            data: gainmap_data,
+        };
+        let gainmap_jpeg = encode_gainmap_jpeg(&gainmap, &metadata).expect("gainmap jpeg");
 
         let mut encoder = UltraHdrEncoder::new();
         encoder

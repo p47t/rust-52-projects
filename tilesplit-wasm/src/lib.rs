@@ -465,9 +465,12 @@ fn create_mpf_app2(
     mpf_data.extend_from_slice(&0u32.to_be_bytes()); // dependent entries
 
     // MP Entry: secondaries
+    // Per MPF spec, offsets are relative to the TIFF header, which is 8 bytes
+    // after the MPF marker start (FF E2(2) + length(2) + "MPF\0"(4)).
+    let tiff_header_offset = mpf_marker_offset as u32 + 8;
     let mut offset = primary_size;
     for &size in secondary_sizes {
-        let relative_offset = offset - mpf_marker_offset as u32;
+        let relative_offset = offset - tiff_header_offset;
         mpf_data.extend_from_slice(&0x00_0000u32.to_be_bytes()); // attribute: dependent child
         mpf_data.extend_from_slice(&size.to_be_bytes());
         mpf_data.extend_from_slice(&relative_offset.to_be_bytes());
@@ -488,13 +491,140 @@ fn create_mpf_app2(
     marker
 }
 
+fn format_xmp_seq(tag: &str, values: &[f32; 3], is_single: bool, use_log2: bool) -> String {
+    let v: [f32; 3] = if use_log2 {
+        [values[0].log2(), values[1].log2(), values[2].log2()]
+    } else {
+        *values
+    };
+    if is_single {
+        format!("        hdrgm:{tag}=\"{:.6}\"", v[0])
+    } else {
+        format!(
+            "        <hdrgm:{tag}>\n          \
+             <rdf:Seq>\n            \
+             <rdf:li>{:.6}</rdf:li>\n            \
+             <rdf:li>{:.6}</rdf:li>\n            \
+             <rdf:li>{:.6}</rdf:li>\n          \
+             </rdf:Seq>\n        \
+             </hdrgm:{tag}>",
+            v[0], v[1], v[2]
+        )
+    }
+}
+
+fn format_xmp_value(values: &[f32; 3], is_single: bool, use_log2: bool) -> String {
+    let v: [f32; 3] = if use_log2 {
+        [values[0].log2(), values[1].log2(), values[2].log2()]
+    } else {
+        *values
+    };
+    if is_single {
+        format!("{:.6}", v[0])
+    } else {
+        format!("{:.6}, {:.6}, {:.6}", v[0], v[1], v[2])
+    }
+}
+
+fn generate_primary_xmp(metadata: &GainMapMetadata, gainmap_length: usize) -> String {
+    let is_single = metadata.is_single_channel();
+    let hdr_capacity_min = metadata.hdr_capacity_min.log2();
+    let hdr_capacity_max = metadata.hdr_capacity_max.log2();
+    let gain_map_min = format_xmp_seq("GainMapMin", &metadata.min_content_boost, is_single, true);
+    let gain_map_max = format_xmp_seq("GainMapMax", &metadata.max_content_boost, is_single, true);
+    let gamma = format_xmp_seq("Gamma", &metadata.gamma, is_single, false);
+    let offset_sdr = format_xmp_value(&metadata.offset_sdr, is_single, false);
+    let offset_hdr = format_xmp_value(&metadata.offset_hdr, is_single, false);
+    format!(
+        r#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+        xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"
+        xmlns:Container="http://ns.google.com/photos/1.0/container/"
+        xmlns:Item="http://ns.google.com/photos/1.0/container/item/"
+        hdrgm:Version="1.0"
+        hdrgm:OffsetSDR="{offset_sdr}"
+        hdrgm:OffsetHDR="{offset_hdr}"
+        hdrgm:HDRCapacityMin="{hdr_capacity_min:.6}"
+        hdrgm:HDRCapacityMax="{hdr_capacity_max:.6}"
+        hdrgm:BaseRenditionIsHDR="False">
+{gain_map_min}
+{gain_map_max}
+{gamma}
+      <Container:Directory>
+        <rdf:Seq>
+          <rdf:li rdf:parseType="Resource">
+            <Container:Item
+                Item:Semantic="Primary"
+                Item:Mime="image/jpeg"/>
+          </rdf:li>
+          <rdf:li rdf:parseType="Resource">
+            <Container:Item
+                Item:Semantic="GainMap"
+                Item:Mime="image/jpeg"
+                Item:Length="{gainmap_length}"/>
+          </rdf:li>
+        </rdf:Seq>
+      </Container:Directory>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#
+    )
+}
+
+fn generate_gainmap_xmp(metadata: &GainMapMetadata) -> String {
+    let is_single = metadata.is_single_channel();
+    let hdr_capacity_min = metadata.hdr_capacity_min.log2();
+    let hdr_capacity_max = metadata.hdr_capacity_max.log2();
+    let gain_map_min = format_xmp_seq("GainMapMin", &metadata.min_content_boost, is_single, true);
+    let gain_map_max = format_xmp_seq("GainMapMax", &metadata.max_content_boost, is_single, true);
+    let gamma = format_xmp_seq("Gamma", &metadata.gamma, is_single, false);
+    let offset_sdr = format_xmp_value(&metadata.offset_sdr, is_single, false);
+    let offset_hdr = format_xmp_value(&metadata.offset_hdr, is_single, false);
+    format!(
+        r#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+        xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"
+        hdrgm:Version="1.0"
+        hdrgm:BaseRenditionIsHDR="False"
+        hdrgm:HDRCapacityMin="{hdr_capacity_min:.6}"
+        hdrgm:HDRCapacityMax="{hdr_capacity_max:.6}"
+        hdrgm:OffsetSDR="{offset_sdr}"
+        hdrgm:OffsetHDR="{offset_hdr}">
+{gain_map_min}
+{gain_map_max}
+{gamma}
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#
+    )
+}
+
+fn embed_xmp_in_jpeg(jpeg: &[u8], xmp: &str) -> Vec<u8> {
+    let xmp_marker = ultrahdr_core::metadata::xmp::create_xmp_app1_marker(xmp);
+    let mut output = Vec::with_capacity(jpeg.len() + xmp_marker.len());
+    output.extend_from_slice(&jpeg[..2]); // SOI
+    output.extend_from_slice(&xmp_marker);
+    output.extend_from_slice(&jpeg[2..]);
+    output
+}
+
 fn assemble_ultrahdr_tile(
     sdr_jpeg: &[u8],
     gainmap_jpeg: &[u8],
     metadata: &GainMapMetadata,
 ) -> Result<Vec<u8>, String> {
-    // Generate XMP and create APP1 marker
-    let xmp = ultrahdr_core::metadata::xmp::generate_xmp(metadata, gainmap_jpeg.len());
+    // Embed gainmap XMP metadata into the gainmap JPEG
+    let gainmap_xmp = generate_gainmap_xmp(metadata);
+    let gainmap_jpeg_with_xmp = embed_xmp_in_jpeg(gainmap_jpeg, &gainmap_xmp);
+
+    // Generate primary XMP and create APP1 marker (using gainmap size WITH its XMP)
+    let xmp = generate_primary_xmp(metadata, gainmap_jpeg_with_xmp.len());
     let xmp_marker = ultrahdr_core::metadata::xmp::create_xmp_app1_marker(&xmp);
 
     // Insert XMP APP1 after SOI
@@ -507,20 +637,21 @@ fn assemble_ultrahdr_tile(
     let insert_pos = find_mpf_insert_position(&primary_with_xmp)?;
 
     // Calculate MPF header size (deterministic for 2 images)
-    let placeholder_mpf = create_mpf_app2(0, &[gainmap_jpeg.len() as u32], insert_pos);
+    let gm_len = gainmap_jpeg_with_xmp.len() as u32;
+    let placeholder_mpf = create_mpf_app2(u32::MAX, &[gm_len], insert_pos);
     let mpf_size = placeholder_mpf.len();
 
     // Final primary size includes the MPF header
     let primary_final_size = (primary_with_xmp.len() + mpf_size) as u32;
-    let mpf_header = create_mpf_app2(primary_final_size, &[gainmap_jpeg.len() as u32], insert_pos);
+    let mpf_header = create_mpf_app2(primary_final_size, &[gm_len], insert_pos);
 
     // Assemble: primary[..insert] + MPF + primary[insert..] + gainmap
-    let total = primary_with_xmp.len() + mpf_header.len() + gainmap_jpeg.len();
+    let total = primary_with_xmp.len() + mpf_header.len() + gainmap_jpeg_with_xmp.len();
     let mut output = Vec::with_capacity(total);
     output.extend_from_slice(&primary_with_xmp[..insert_pos]);
     output.extend_from_slice(&mpf_header);
     output.extend_from_slice(&primary_with_xmp[insert_pos..]);
-    output.extend_from_slice(gainmap_jpeg);
+    output.extend_from_slice(&gainmap_jpeg_with_xmp);
 
     Ok(output)
 }
@@ -568,7 +699,9 @@ fn split_tile(data: &[u8], quality: u8, side: Side) -> Result<Vec<u8>, String> {
         );
 
         let sdr_jpeg = crop_and_encode_jpeg(&img, rect, quality)?;
-        let gm_jpeg = crop_and_encode_jpeg(&gainmap_img, gainmap_rect, quality)?;
+        // Always encode gain map at max quality — quantization errors get amplified
+        // exponentially when the gain map is applied (boost = max_boost^(pixel/255)).
+        let gm_jpeg = crop_and_encode_jpeg(&gainmap_img, gainmap_rect, 100)?;
 
         return assemble_ultrahdr_tile(&sdr_jpeg, &gm_jpeg, &uhdr.metadata);
     }
