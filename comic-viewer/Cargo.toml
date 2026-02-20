@@ -1,0 +1,11 @@
+[package]
+name = "comic-viewer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { version = "0.13", features = ["image"] }
+zip = "2"
+rfd = "0.14"
+sevenz-rust = "0.6"
+smol = "2"

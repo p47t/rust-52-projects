@@ -31,6 +31,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 27. **media-metadata-explorer** (2026-02-13) - Multimedia metadata inspector with libavformat-powered stream analysis and catalog summaries
 28. **tilesplit** (2026-02-13) - tile splitter with Ultra HDR gain map support
 29. **tilesplit-wasm** (2026-02-14) - Browser-based image tile splitter with Ultra HDR gain map support (WASM)
+30. **comic-viewer** (2026-02-19) - CBZ comic book viewer with keyboard navigation using Iced UI
 
 ## Build Commands
 
