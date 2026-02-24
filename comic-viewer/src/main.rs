@@ -373,9 +373,11 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         iced::keyboard::on_key_press(|key, _modifiers| match key.as_ref() {
-            iced::keyboard::Key::Named(Named::ArrowRight)
-            | iced::keyboard::Key::Named(Named::PageDown) => Some(Message::NextPage),
             iced::keyboard::Key::Named(Named::ArrowLeft)
+            | iced::keyboard::Key::Named(Named::ArrowDown)
+            | iced::keyboard::Key::Named(Named::PageDown) => Some(Message::NextPage),
+            iced::keyboard::Key::Named(Named::ArrowRight)
+            | iced::keyboard::Key::Named(Named::ArrowUp)
             | iced::keyboard::Key::Named(Named::PageUp) => Some(Message::PrevPage),
             _ => None,
         })
