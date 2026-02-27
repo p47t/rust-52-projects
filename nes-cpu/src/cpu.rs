@@ -88,6 +88,28 @@ impl Cpu {
         (hi << 8) | lo
     }
 
+    // ── Interrupt vectors ───────────────────────────────────────────────────
+
+    pub fn nmi(&mut self) {
+        self.push16(self.pc);
+        // Push P with B clear, U set (hardware interrupt)
+        self.push8((self.p & !flags::B) | flags::U);
+        self.flag_set(flags::I);
+        let lo = self.bus.read(0xFFFA) as u16;
+        let hi = self.bus.read(0xFFFB) as u16;
+        self.pc = (hi << 8) | lo;
+        self.cycles += 7;
+    }
+
+    pub fn reset(&mut self) {
+        let lo = self.bus.read(0xFFFC) as u16;
+        let hi = self.bus.read(0xFFFD) as u16;
+        self.pc = (hi << 8) | lo;
+        self.sp = self.sp.wrapping_sub(3);
+        self.flag_set(flags::I);
+        self.cycles += 7;
+    }
+
     // ── Execute one instruction, return the log line captured before ─────────
 
     pub fn step(&mut self) -> String {
@@ -102,9 +124,11 @@ impl Cpu {
         let extra = if instr.page_cross_penalty && page_crossed { 1u64 } else { 0 };
         let cost = instr.cycles as u64 + extra;
 
-        self.execute(instr, addr);
-
+        // Add cycle cost BEFORE execute so that PPU catch-up during
+        // bus reads sees the correct CPU cycle count.
         self.cycles += cost;
+
+        self.execute(instr, addr);
 
         log_line
     }
@@ -208,7 +232,7 @@ impl Cpu {
 
     // ── Operand read helper ───────────────────────────────────────────────────
 
-    fn operand_read(&self, mode: AddrMode, addr: u16) -> u8 {
+    fn operand_read(&mut self, mode: AddrMode, addr: u16) -> u8 {
         match mode {
             AddrMode::Accumulator => self.a,
             _ => self.bus.read(addr),
@@ -612,22 +636,33 @@ impl Cpu {
                 self.bus.write(addr, result);
             }
 
+            Brk => {
+                // BRK: push PC+1 (skip padding byte), push P with B set, set I, jump to IRQ vector
+                self.pc = self.pc.wrapping_add(1); // skip padding byte
+                self.push16(self.pc);
+                self.push8(self.p | flags::B | flags::U);
+                self.flag_set(flags::I);
+                let lo = self.bus.read(0xFFFE) as u16;
+                let hi = self.bus.read(0xFFFF) as u16;
+                self.pc = (hi << 8) | lo;
+            }
+
             Kil => {
-                // BRK or KIL — for nestest just handle as a no-op to avoid panic
-                // Real BRK would push PC+1, flags, set I, jump to IRQ vector
+                // KIL/JAM — halt the CPU
+                self.pc = self.pc.wrapping_sub(1);
             }
         }
     }
 
     // ── Log state (captured BEFORE stepping) ─────────────────────────────────
 
-    pub fn log_state(&self) -> String {
-        let opcode_byte = self.bus.read(self.pc);
+    pub fn log_state(&mut self) -> String {
+        let opcode_byte = self.bus.peek(self.pc);
         let instr = get_opcodes()[opcode_byte as usize];
         let byte_count = instr_byte_count(instr.mode);
 
-        let b1 = if byte_count > 1 { self.bus.read(self.pc.wrapping_add(1)) } else { 0 };
-        let b2 = if byte_count > 2 { self.bus.read(self.pc.wrapping_add(2)) } else { 0 };
+        let b1 = if byte_count > 1 { self.bus.peek(self.pc.wrapping_add(1)) } else { 0 };
+        let b2 = if byte_count > 2 { self.bus.peek(self.pc.wrapping_add(2)) } else { 0 };
 
         // Raw bytes column (padded to 9 chars)
         let raw = match byte_count {
@@ -678,19 +713,19 @@ impl Cpu {
             Immediate => format!("{} #${:02X}", mne, b1),
 
             ZeroPage => {
-                let val = self.bus.read(b1 as u16);
+                let val = self.bus.peek(b1 as u16);
                 format!("{} ${:02X} = {:02X}", mne, b1, val)
             }
 
             ZeroPageX => {
                 let eff = b1.wrapping_add(self.x);
-                let val = self.bus.read(eff as u16);
+                let val = self.bus.peek(eff as u16);
                 format!("{} ${:02X},X @ {:02X} = {:02X}", mne, b1, eff, val)
             }
 
             ZeroPageY => {
                 let eff = b1.wrapping_add(self.y);
-                let val = self.bus.read(eff as u16);
+                let val = self.bus.peek(eff as u16);
                 format!("{} ${:02X},Y @ {:02X} = {:02X}", mne, b1, eff, val)
             }
 
@@ -698,7 +733,7 @@ impl Cpu {
                 match instr.kind {
                     Jmp | Jsr => format!("{} ${:04X}", mne, abs_addr),
                     _ => {
-                        let val = self.bus.read(abs_addr);
+                        let val = self.bus.peek(abs_addr);
                         format!("{} ${:04X} = {:02X}", mne, abs_addr, val)
                     }
                 }
@@ -706,41 +741,40 @@ impl Cpu {
 
             AbsoluteX => {
                 let eff = abs_addr.wrapping_add(self.x as u16);
-                let val = self.bus.read(eff);
+                let val = self.bus.peek(eff);
                 format!("{} ${:04X},X @ {:04X} = {:02X}", mne, abs_addr, eff, val)
             }
 
             AbsoluteY => {
                 let eff = abs_addr.wrapping_add(self.y as u16);
-                let val = self.bus.read(eff);
+                let val = self.bus.peek(eff);
                 format!("{} ${:04X},Y @ {:04X} = {:02X}", mne, abs_addr, eff, val)
             }
 
             Indirect => {
-                // JMP only — show pointer and destination
                 let ptr = abs_addr;
-                let lo2 = self.bus.read(ptr) as u16;
-                let hi2 = self.bus.read((ptr & 0xFF00) | ((ptr + 1) & 0x00FF)) as u16;
+                let lo2 = self.bus.peek(ptr) as u16;
+                let hi2 = self.bus.peek((ptr & 0xFF00) | ((ptr + 1) & 0x00FF)) as u16;
                 let dest = (hi2 << 8) | lo2;
                 format!("{} (${:04X}) = {:04X}", mne, ptr, dest)
             }
 
             IndirectX => {
                 let ptr = b1.wrapping_add(self.x) as u16;
-                let lo2 = self.bus.read(ptr & 0x00FF) as u16;
-                let hi2 = self.bus.read((ptr.wrapping_add(1)) & 0x00FF) as u16;
+                let lo2 = self.bus.peek(ptr & 0x00FF) as u16;
+                let hi2 = self.bus.peek((ptr.wrapping_add(1)) & 0x00FF) as u16;
                 let eff = (hi2 << 8) | lo2;
-                let val = self.bus.read(eff);
+                let val = self.bus.peek(eff);
                 format!("{} (${:02X},X) @ {:02X} = {:04X} = {:02X}", mne, b1, ptr as u8, eff, val)
             }
 
             IndirectY => {
                 let ptr = b1 as u16;
-                let lo2 = self.bus.read(ptr & 0x00FF) as u16;
-                let hi2 = self.bus.read((ptr.wrapping_add(1)) & 0x00FF) as u16;
+                let lo2 = self.bus.peek(ptr & 0x00FF) as u16;
+                let hi2 = self.bus.peek((ptr.wrapping_add(1)) & 0x00FF) as u16;
                 let base = (hi2 << 8) | lo2;
                 let eff = base.wrapping_add(self.y as u16);
-                let val = self.bus.read(eff);
+                let val = self.bus.peek(eff);
                 format!("{} (${:02X}),Y = {:04X} @ {:04X} = {:02X}", mne, b1, base, eff, val)
             }
 

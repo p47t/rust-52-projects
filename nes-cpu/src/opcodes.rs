@@ -67,6 +67,8 @@ pub enum OpKind {
     Ahx,
     // Unofficial LAS
     Las,
+    // BRK (software interrupt)
+    Brk,
     // KIL / JAM
     Kil,
 }
@@ -324,7 +326,7 @@ fn build_table() -> [Instruction; 256] {
 
     // ── BRK ──────────────────────────────────────────────────────────────────
     // BRK is not tested by nestest directly but needs to exist
-    op!(0x00, Kil, "BRK", Implied, 7);
+    op!(0x00, Brk, "BRK", Implied, 7);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // UNOFFICIAL OPCODES

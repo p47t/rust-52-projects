@@ -1,26 +1,44 @@
 use crate::ines::{INesRom, Mirroring};
 
-#[allow(dead_code)] // mirroring/mapper stored for future PPU/mapper support
+/// Trait for I/O devices mapped into the CPU address space.
+/// PPU registers ($2000-$3FFF) and OAM DMA ($4014) route through this.
+pub trait BusIo {
+    fn read(&mut self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, val: u8);
+}
+
 pub struct Bus {
     ram: [u8; 2048],
+    prg_ram: [u8; 8192], // $6000-$7FFF (battery/work RAM, blargg test output)
     prg_rom: Vec<u8>,
     pub mirroring: Mirroring,
     pub mapper: u8,
+    pub io: Option<Box<dyn BusIo>>,
 }
 
 impl Bus {
     pub fn from_rom(rom: INesRom) -> Self {
         Self {
             ram: [0u8; 2048],
+            prg_ram: [0u8; 8192],
             prg_rom: rom.prg_rom,
             mirroring: rom.mirroring,
             mapper: rom.mapper,
+            io: None,
         }
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],
+            0x2000..=0x3FFF => {
+                if let Some(io) = &mut self.io {
+                    io.read(0x2000 + (addr & 0x0007))
+                } else {
+                    0xFF
+                }
+            }
+            0x6000..=0x7FFF => self.prg_ram[(addr - 0x6000) as usize],
             0x8000..=0xFFFF => {
                 let offset = (addr - 0x8000) as usize % self.prg_rom.len();
                 self.prg_rom[offset]
@@ -29,9 +47,39 @@ impl Bus {
         }
     }
 
+    /// Read without side effects — skips I/O registers to avoid PPU/APU side effects.
+    /// Used for logging and disassembly.
+    pub fn peek(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize],
+            0x2000..=0x5FFF => 0xFF, // I/O — don't trigger side effects
+            0x6000..=0x7FFF => self.prg_ram[(addr - 0x6000) as usize],
+            _ => {
+                if addr >= 0x8000 {
+                    let offset = (addr - 0x8000) as usize % self.prg_rom.len();
+                    self.prg_rom[offset]
+                } else {
+                    0xFF
+                }
+            }
+        }
+    }
+
     pub fn write(&mut self, addr: u16, val: u8) {
-        if let 0x0000..=0x1FFF = addr {
-            self.ram[(addr & 0x07FF) as usize] = val;
+        match addr {
+            0x0000..=0x1FFF => self.ram[(addr & 0x07FF) as usize] = val,
+            0x2000..=0x3FFF => {
+                if let Some(io) = &mut self.io {
+                    io.write(0x2000 + (addr & 0x0007), val);
+                }
+            }
+            0x4014 => {
+                if let Some(io) = &mut self.io {
+                    io.write(0x4014, val);
+                }
+            }
+            0x6000..=0x7FFF => self.prg_ram[(addr - 0x6000) as usize] = val,
+            _ => {}
         }
     }
 }
@@ -65,8 +113,17 @@ mod tests {
     fn test_rom_mirror() {
         let mut rom = vec![0u8; 0x4000]; // 16KB
         rom[0] = 0x4C; // JMP at offset 0 (maps to 0x8000 and 0xC000)
-        let bus = make_bus(rom);
+        let mut bus = make_bus(rom);
         assert_eq!(bus.read(0x8000), 0x4C);
         assert_eq!(bus.read(0xC000), 0x4C); // mirrored
+    }
+
+    #[test]
+    fn test_prg_ram() {
+        let mut bus = make_bus(vec![0u8; 0x4000]);
+        bus.write(0x6000, 0x42);
+        assert_eq!(bus.read(0x6000), 0x42);
+        bus.write(0x7FFF, 0xAB);
+        assert_eq!(bus.read(0x7FFF), 0xAB);
     }
 }

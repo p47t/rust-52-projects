@@ -1,0 +1,9 @@
+[package]
+name = "nes-ppu"
+version = "0.1.0"
+edition = "2021"
+description = "NES PPU emulator targeting blargg's ppu_vbl_nmi tests"
+
+[dependencies]
+nes-cpu = { path = "../nes-cpu" }
+anyhow = "1"
