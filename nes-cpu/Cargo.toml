@@ -1,0 +1,8 @@
+[package]
+name = "nes-cpu"
+version = "0.1.0"
+edition = "2021"
+description = "NES 2A03 CPU emulator that passes nestest"
+
+[dependencies]
+anyhow = "1"
