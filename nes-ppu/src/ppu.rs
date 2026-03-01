@@ -1,14 +1,102 @@
 use nes_cpu::ines::Mirroring;
 
-pub const PPU_2000_CTRL: u16 = 0x2000;
-pub const PPU_2001_MASK: u16 = 0x2001;
-pub const PPU_2002_STATUS: u16 = 0x2002;
-pub const PPU_2003_OAM_ADDR: u16 = 0x2003;
-pub const PPU_2004_OAM_DATA: u16 = 0x2004;
-pub const PPU_2005_SCROLL: u16 = 0x2005;
-pub const PPU_2006_ADDR: u16 = 0x2006;
-pub const PPU_2007_DATA: u16 = 0x2007;
-pub const PPU_4014_OAM_DMA: u16 = 0x4014;
+/// PPU memory-mapped registers
+///
+/// Name      Address Bits                Type  Notes
+/// PPUCTRL   $2000   VPHB SINN           W     NMI enable (V), PPU master/slave (P), sprite height (H), background tile select (B), sprite tile select (S), increment mode (I), nametable select / X and Y scroll bit 8 (NN)
+/// PPUMASK   $2001   BGRs bMmG           W     color emphasis (BGR), sprite enable (s), background enable (b), sprite left column enable (M), background left column enable (m), greyscale (G)
+/// PPUSTATUS $2002   VSO- ----           R     vblank (V), sprite 0 hit (S), sprite overflow (O); read resets write pair for $2005/$2006
+/// OAMADDR   $2003   AAAA AAAA           W     OAM read/write address
+/// OAMDATA   $2004   DDDD DDDD           RW    OAM data read/write
+/// PPUSCROLL $2005   XXXX XXXX YYYY YYYY Wx2   X and Y scroll bits 7-0 (two writes: X scroll, then Y scroll)
+/// PPUADDR   $2006   ..AA AAAA AAAA AAAA Wx2   VRAM address (two writes: most significant byte, then least significant byte)
+/// PPUDATA   $2007   DDDD DDDD           RW    VRAM data read/write
+/// OAMDMA    $4014   AAAA AAAA           W     OAM DMA high address
+pub mod registers {
+    pub const CTRL: u16 = 0x2000;
+    pub const MASK: u16 = 0x2001;
+    pub const STATUS: u16 = 0x2002;
+    pub const OAM_ADDR: u16 = 0x2003;
+    pub const OAM_DATA: u16 = 0x2004;
+    pub const SCROLL: u16 = 0x2005;
+    pub const ADDR: u16 = 0x2006;
+    pub const DATA: u16 = 0x2007;
+    pub const OAM_DMA: u16 = 0x4014;
+}
+
+/// PPUCTRL ($2000) bit flags.
+/// 
+/// 7  bit  0
+/// ---- ----
+/// VPHB SINN
+/// |||| ||||
+/// |||| ||++- Base nametable address
+/// |||| ||    (0 = $2000; 1 = $2400; 2 = $2800; 3 = $2C00)
+/// |||| |+--- VRAM address increment per CPU read/write of PPUDATA
+/// |||| |     (0: add 1, going across; 1: add 32, going down)
+/// |||| +---- Sprite pattern table address for 8x8 sprites
+/// ||||       (0: $0000; 1: $1000; ignored in 8x16 mode)
+/// |||+------ Background pattern table address (0: $0000; 1: $1000)
+/// ||+------- Sprite size (0: 8x8 pixels; 1: 8x16 pixels – see PPU OAM#Byte 1)
+/// |+-------- PPU master/slave select
+/// |          (0: read backdrop from EXT pins; 1: output color on EXT pins)
+/// +--------- Vblank NMI enable (0: off, 1: on)
+pub mod ctrl {
+    pub const NAMETABLE_SELECT: u8 = 0b0000_0011;
+    pub const VRAM_INCREMENT: u8 = 0b0000_0100;
+    pub const NMI_ENABLE: u8 = 0b1000_0000;
+}
+
+/// PPUMASK ($2001) bit flags.
+/// 
+/// 7  bit  0
+/// ---- ----
+/// BGRs bMmG
+/// |||| ||||
+/// |||| |||+- Greyscale (0: normal color, 1: greyscale)
+/// |||| ||+-- 1: Show background in leftmost 8 pixels of screen, 0: Hide
+/// |||| |+--- 1: Show sprites in leftmost 8 pixels of screen, 0: Hide
+/// |||| +---- 1: Enable background rendering
+/// |||+------ 1: Enable sprite rendering
+/// ||+------- Emphasize red (green on PAL/Dendy)
+/// |+-------- Emphasize green (red on PAL/Dendy)
+/// +--------- Emphasize blue
+pub mod mask {
+    pub const SHOW_BG: u8 = 0b0000_1000;
+    pub const SHOW_SPRITES: u8 = 0b0001_0000;
+    pub const RENDERING: u8 = SHOW_BG | SHOW_SPRITES;
+}
+
+/// PPUSTATUS ($2002) bit flags.
+///
+/// 7  bit  0
+/// ---- ----
+/// VSOx xxxx
+/// |||| ||||
+/// |||+-++++- (PPU open bus or 2C05 PPU identifier)
+/// ||+------- Sprite overflow flag
+/// |+-------- Sprite 0 hit flag
+/// +--------- Vblank flag, cleared on read. Unreliable; see below.
+pub mod status {
+    pub const SPRITE_OVERFLOW: u8 = 0b0010_0000;
+    pub const SPRITE0_HIT: u8 = 0b0100_0000;
+    pub const VBLANK: u8 = 0b1000_0000;
+    pub const FLAGS: u8 = SPRITE_OVERFLOW | SPRITE0_HIT | VBLANK;
+}
+
+/// PPU timing constants.
+pub mod timing {
+    /// Scanline where VBlank begins (dot 1 sets the flag).
+    pub const VBLANK_LINE: i16 = 241;
+    /// Pre-render scanline (clears flags at dot 1, odd-frame skip at dot 339).
+    pub const PRERENDER_LINE: i16 = 261;
+    /// Last dot index on a scanline (0-indexed).
+    pub const LAST_DOT: u16 = 340;
+    /// Dot on the pre-render line where the odd-frame skip decision is made.
+    pub const ODD_SKIP_DOT: u16 = 339;
+    /// Dot where per-scanline events fire (flag set/clear).
+    pub const EVENT_DOT: u16 = 1;
+}
 
 pub struct Ppu {
     // Control registers
@@ -106,21 +194,24 @@ impl Ppu {
 
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
-            PPU_2000_CTRL | PPU_2001_MASK | PPU_2003_OAM_ADDR | PPU_2005_SCROLL
-            | PPU_2006_ADDR => self.data_bus,
+            registers::CTRL | registers::MASK | registers::OAM_ADDR | registers::SCROLL
+            | registers::ADDR => self.data_bus,
 
-            PPU_2002_STATUS => {
+            registers::STATUS => {
                 let effective_status = self.status;
                 // Status: bits 7-5 from status, bits 4-0 from data bus latch
-                let val = (effective_status & 0xE0) | (self.data_bus & 0x1F);
+                let val = (effective_status & status::FLAGS) | (self.data_bus & !status::FLAGS);
                 // Reading clears VBlank flag
-                self.status &= !0x80;
+                self.status &= !status::VBLANK;
                 self.nmi_occurred = false;
                 self.update_nmi(false);
                 // NMI suppression window: reading $2002 within 1 PPU tick of
                 // VBlank set (scanline 241, dots 1-2) pulls /NMI high too
                 // quickly after it went low — the CPU never latches the edge.
-                if self.scanline == 241 && self.dot >= 1 && self.dot <= 2 {
+                if self.scanline == timing::VBLANK_LINE
+                    && self.dot >= timing::EVENT_DOT
+                    && self.dot <= timing::EVENT_DOT + 1
+                {
                     self.nmi_pending = false;
                 }
                 // Reset address latch
@@ -129,14 +220,14 @@ impl Ppu {
                 val
             }
 
-            PPU_2004_OAM_DATA => {
+            registers::OAM_DATA => {
                 // OAM data read
                 let val = self.oam[self.oam_addr as usize];
                 self.data_bus = val;
                 val
             }
 
-            PPU_2007_DATA => {
+            registers::DATA => {
                 // VRAM data read (buffered, except palette)
                 let addr = self.v & 0x3FFF;
                 let val = if addr >= 0x3F00 {
@@ -167,13 +258,13 @@ impl Ppu {
         self.data_bus = val;
 
         match addr {
-            PPU_2000_CTRL => {
+            registers::CTRL => {
                 // PPUCTRL
                 self.ctrl = val;
                 // t: ...GH.. ........ = val: ......GH (nametable select)
-                self.t = (self.t & 0xF3FF) | ((val as u16 & 0x03) << 10);
+                self.t = (self.t & 0xF3FF) | ((val as u16 & ctrl::NAMETABLE_SELECT as u16) << 10);
                 let was_output = self.nmi_output;
-                self.nmi_output = val & 0x80 != 0;
+                self.nmi_output = val & ctrl::NMI_ENABLE != 0;
                 self.update_nmi(false);
                 // Age-based NMI cancellation: if NMI was just disabled and
                 // VBlank set the NMI within the last few PPU ticks, the CPU
@@ -194,23 +285,23 @@ impl Ppu {
                 }
             }
 
-            PPU_2001_MASK => {
+            registers::MASK => {
                 // PPUMASK
                 self.mask = val;
             }
 
-            PPU_2003_OAM_ADDR => {
+            registers::OAM_ADDR => {
                 // OAMADDR
                 self.oam_addr = val;
             }
 
-            PPU_2004_OAM_DATA => {
+            registers::OAM_DATA => {
                 // OAMDATA write
                 self.oam[self.oam_addr as usize] = val;
                 self.oam_addr = self.oam_addr.wrapping_add(1);
             }
 
-            PPU_2005_SCROLL => {
+            registers::SCROLL => {
                 // PPUSCROLL (two writes)
                 if !self.addr_latch {
                     // First write: X scroll
@@ -225,7 +316,7 @@ impl Ppu {
                 self.addr_latch = !self.addr_latch;
             }
 
-            PPU_2006_ADDR => {
+            registers::ADDR => {
                 // PPUADDR (two writes)
                 if !self.addr_latch {
                     // First write: high byte
@@ -238,7 +329,7 @@ impl Ppu {
                 self.addr_latch = !self.addr_latch;
             }
 
-            PPU_2007_DATA => {
+            registers::DATA => {
                 // VRAM data write
                 let a = self.v & 0x3FFF;
                 if a >= 0x3F00 {
@@ -249,7 +340,7 @@ impl Ppu {
                 self.v = self.v.wrapping_add(self.vram_increment()) & 0x7FFF;
             }
 
-            PPU_4014_OAM_DMA => {
+            registers::OAM_DMA => {
                 // OAM DMA — handled by System, just record the page
                 self.dma_page = Some(val);
             }
@@ -278,40 +369,40 @@ impl Ppu {
         // triggering the normal scanline wrap. On real hardware, the BG
         // fetch circuit evaluates rendering state at cycle 339 (not 340).
         // Reference: Mesen PPU.cpp checks IsRenderingEnabled() at _cycle==339.
-        if self.scanline == 261
-            && self.dot == 339
+        if self.scanline == timing::PRERENDER_LINE
+            && self.dot == timing::ODD_SKIP_DOT
             && self.odd_frame
             && self.rendering_enabled()
         {
-            self.dot = 340;
+            self.dot = timing::LAST_DOT;
             // Fall through — next tick increments to 341, triggering wrap
         }
 
-        if self.dot > 340 {
+        if self.dot > timing::LAST_DOT {
             self.dot = 0;
             self.scanline += 1;
-            if self.scanline > 261 {
+            if self.scanline > timing::PRERENDER_LINE {
                 self.scanline = 0;
                 self.odd_frame = !self.odd_frame;
             }
         }
 
         // Pre-render scanline (261): clear flags at dot 1
-        if self.scanline == 261 && self.dot == 1 {
-            self.status &= !0xE0; // clear VBlank, sprite 0, overflow
+        if self.scanline == timing::PRERENDER_LINE && self.dot == timing::EVENT_DOT {
+            self.status &= !status::FLAGS; // clear VBlank, sprite 0, overflow
             self.nmi_occurred = false;
             self.update_nmi(true);
         }
 
         // Scanline 241 (start of VBlank): set flag at dot 1
-        if self.scanline == 241 && self.dot == 1 {
+        if self.scanline == timing::VBLANK_LINE && self.dot == timing::EVENT_DOT {
             if self.suppress_vbl {
                 // VBlank suppressed: $2002 was read on the exact cycle before
                 // VBlank would be set. On real hardware this race condition
                 // prevents the flag from ever being set this frame.
                 self.suppress_vbl = false;
             } else {
-                self.status |= 0x80;
+                self.status |= status::VBLANK;
                 self.nmi_occurred = true;
                 self.update_nmi(true);
             }
@@ -364,7 +455,7 @@ impl Ppu {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     fn vram_increment(&self) -> u16 {
-        if self.ctrl & 0x04 != 0 {
+        if self.ctrl & ctrl::VRAM_INCREMENT != 0 {
             32
         } else {
             1
@@ -372,7 +463,7 @@ impl Ppu {
     }
 
     fn rendering_enabled(&self) -> bool {
-        self.mask & 0x18 != 0 // show background or sprites
+        self.mask & mask::RENDERING != 0 // show background or sprites
     }
 
     // ── VRAM address mapping ────────────────────────────────────────────────
@@ -464,11 +555,11 @@ mod tests {
     #[test]
     fn test_status_read_clears_vblank() {
         let mut ppu = make_ppu();
-        ppu.status = 0x80;
+        ppu.status = status::VBLANK;
         ppu.nmi_occurred = true;
-        let val = ppu.read_register(PPU_2002_STATUS);
-        assert_eq!(val & 0x80, 0x80);
-        assert_eq!(ppu.status & 0x80, 0);
+        let val = ppu.read_register(registers::STATUS);
+        assert_eq!(val & status::VBLANK, status::VBLANK);
+        assert_eq!(ppu.status & status::VBLANK, 0);
         assert!(!ppu.nmi_occurred);
     }
 
@@ -476,30 +567,30 @@ mod tests {
     fn test_status_read_resets_latch() {
         let mut ppu = make_ppu();
         ppu.addr_latch = true;
-        ppu.read_register(PPU_2002_STATUS);
+        ppu.read_register(registers::STATUS);
         assert!(!ppu.addr_latch);
     }
 
     #[test]
     fn test_ppuaddr_two_writes() {
         let mut ppu = make_ppu();
-        ppu.write_register(PPU_2006_ADDR, 0x21); // high byte
-        ppu.write_register(PPU_2006_ADDR, 0x08); // low byte → v = $2108
+        ppu.write_register(registers::ADDR, 0x21); // high byte
+        ppu.write_register(registers::ADDR, 0x08); // low byte → v = $2108
         assert_eq!(ppu.v, 0x2108);
     }
 
     #[test]
     fn test_vram_write_and_read() {
         let mut ppu = make_ppu();
-        ppu.write_register(PPU_2006_ADDR, 0x20);
-        ppu.write_register(PPU_2006_ADDR, 0x00);
-        ppu.write_register(PPU_2007_DATA, 0x42); // write to $2000
+        ppu.write_register(registers::ADDR, 0x20);
+        ppu.write_register(registers::ADDR, 0x00);
+        ppu.write_register(registers::DATA, 0x42); // write to $2000
 
         // Read back: first read returns buffer, second returns value
-        ppu.write_register(PPU_2006_ADDR, 0x20);
-        ppu.write_register(PPU_2006_ADDR, 0x00);
-        ppu.read_register(PPU_2007_DATA); // primes buffer
-        let val = ppu.read_register(PPU_2007_DATA);
+        ppu.write_register(registers::ADDR, 0x20);
+        ppu.write_register(registers::ADDR, 0x00);
+        ppu.read_register(registers::DATA); // primes buffer
+        let val = ppu.read_register(registers::DATA);
         assert_eq!(val, 0x42);
     }
 
@@ -507,33 +598,33 @@ mod tests {
     fn test_palette_mirror() {
         let mut ppu = make_ppu();
         // Write to $3F10 should mirror to $3F00
-        ppu.write_register(PPU_2006_ADDR, 0x3F);
-        ppu.write_register(PPU_2006_ADDR, 0x10);
-        ppu.write_register(PPU_2007_DATA, 0x2A);
+        ppu.write_register(registers::ADDR, 0x3F);
+        ppu.write_register(registers::ADDR, 0x10);
+        ppu.write_register(registers::DATA, 0x2A);
         assert_eq!(ppu.palette[0x00], 0x2A);
     }
 
     #[test]
     fn test_vblank_timing() {
         let mut ppu = make_ppu();
-        ppu.scanline = 241;
+        ppu.scanline = timing::VBLANK_LINE;
         ppu.dot = 0;
         ppu.nmi_output = true;
         ppu.tick(); // dot 0 → dot 1: VBlank sets
         assert!(ppu.nmi_occurred);
-        assert!(ppu.status & 0x80 != 0);
+        assert!(ppu.status & status::VBLANK != 0);
         assert!(ppu.nmi_pending);
     }
 
     #[test]
     fn test_prerender_clears_flags() {
         let mut ppu = make_ppu();
-        ppu.status = 0xE0; // VBlank + sprite0 + overflow
+        ppu.status = status::FLAGS; // VBlank + sprite0 + overflow
         ppu.nmi_occurred = true;
-        ppu.scanline = 261;
+        ppu.scanline = timing::PRERENDER_LINE;
         ppu.dot = 0;
         ppu.tick(); // dot 1: clear flags
-        assert_eq!(ppu.status & 0xE0, 0);
+        assert_eq!(ppu.status & status::FLAGS, 0);
         assert!(!ppu.nmi_occurred);
     }
 
@@ -541,28 +632,28 @@ mod tests {
     fn test_nmi_enable_during_vblank() {
         let mut ppu = make_ppu();
         ppu.nmi_occurred = true;
-        ppu.status |= 0x80;
+        ppu.status |= status::VBLANK;
         ppu.nmi_output = false;
         ppu.nmi_pending = false;
         // Enable NMI while VBlank flag is set → should trigger
-        ppu.write_register(PPU_2000_CTRL, 0x80);
+        ppu.write_register(registers::CTRL, ctrl::NMI_ENABLE);
         assert!(ppu.nmi_pending);
     }
 
     #[test]
     fn test_ctrl_nametable_bits_to_t() {
         let mut ppu = make_ppu();
-        ppu.write_register(PPU_2000_CTRL, 0x03); // nametable = 3
+        ppu.write_register(registers::CTRL, 0x03); // nametable = 3
         assert_eq!(ppu.t & 0x0C00, 0x0C00);
     }
 
     #[test]
     fn test_vram_increment_32() {
         let mut ppu = make_ppu();
-        ppu.write_register(PPU_2000_CTRL, 0x04); // increment by 32
-        ppu.write_register(PPU_2006_ADDR, 0x20);
-        ppu.write_register(PPU_2006_ADDR, 0x00);
-        ppu.write_register(PPU_2007_DATA, 0x11);
+        ppu.write_register(registers::CTRL, ctrl::VRAM_INCREMENT); // increment by 32
+        ppu.write_register(registers::ADDR, 0x20);
+        ppu.write_register(registers::ADDR, 0x00);
+        ppu.write_register(registers::DATA, 0x11);
         assert_eq!(ppu.v, 0x2020); // $2000 + 32
     }
 
@@ -570,9 +661,9 @@ mod tests {
     fn test_horizontal_mirroring() {
         let mut ppu = make_ppu();
         // Write to nametable 0 ($2000)
-        ppu.write_register(PPU_2006_ADDR, 0x20);
-        ppu.write_register(PPU_2006_ADDR, 0x05);
-        ppu.write_register(PPU_2007_DATA, 0xAB);
+        ppu.write_register(registers::ADDR, 0x20);
+        ppu.write_register(registers::ADDR, 0x05);
+        ppu.write_register(registers::DATA, 0xAB);
         // Nametable 1 ($2400) should mirror nametable 0 in horizontal
         let idx0 = ppu.mirror_nametable_addr(0x2005);
         let idx1 = ppu.mirror_nametable_addr(0x2405);

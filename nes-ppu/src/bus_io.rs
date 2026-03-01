@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use nes_cpu::bus::BusIo;
 
-use crate::ppu::Ppu;
+use crate::ppu::{timing, Ppu};
 
 /// Bridges the PPU to the CPU address bus via the BusIo trait.
 /// Implements catch-up ticking: before any PPU register access,
@@ -54,7 +54,7 @@ impl BusIo for PpuBusIo {
             // Check for VBlank suppression: if PPU is at (241, 0), the
             // next tick would set VBlank. Reading $2002 now creates a race
             // that suppresses VBlank from ever being set this frame.
-            if ppu.scanline == 241 && ppu.dot == 0 {
+            if ppu.scanline == timing::VBLANK_LINE && ppu.dot == 0 {
                 ppu.suppress_vbl = true;
             }
 
