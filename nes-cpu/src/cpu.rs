@@ -785,6 +785,29 @@ impl Cpu {
             }
         }
     }
+
+    /// Load raw program bytes at 0x0600 and set PC to the entry point.
+    /// Used for simple test ROMs that run from RAM (e.g. the snake game).
+    pub fn load_program(&mut self, program: &[u8]) {
+        for (i, &byte) in program.iter().enumerate() {
+            self.bus.write(0x0600 + i as u16, byte);
+        }
+        self.pc = 0x0600;
+    }
+
+    /// Run the CPU in a loop, calling `callback` before each instruction.
+    /// The callback receives `&mut Cpu` and returns `true` to continue or `false` to stop.
+    pub fn run_with_callback<F>(&mut self, mut callback: F)
+    where
+        F: FnMut(&mut Self) -> bool,
+    {
+        loop {
+            if !callback(self) {
+                break;
+            }
+            self.step();
+        }
+    }
 }
 
 #[cfg(test)]

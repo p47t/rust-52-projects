@@ -33,6 +33,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 29. **tilesplit-wasm** (2026-02-14) - Browser-based image tile splitter with Ultra HDR gain map support (WASM)
 30. **comic-viewer** (2026-02-19) - CBZ comic book viewer with keyboard navigation using Iced UI
 31. **nes-cpu** (2026-02-27) - NES 2A03 CPU emulator (6502) that passes nestest.nes
+32. **nes-ppu** (2026-03-01) - NES 2C02 PPU emulator with cycle-accurate VBL/NMI timing
 
 ## Build Commands
 
@@ -62,6 +63,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 ## Project Categories
 
 **System Programming**: small-os, shell
+**Emulation**: nes-cpu, nes-ppu
 **Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp
 **Parsers/Encoders**: ebml, clog
 **Utilities**: calculator, count-words, rolldice, plum

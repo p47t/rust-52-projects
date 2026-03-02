@@ -4,5 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "NES 2A03 CPU emulator that passes nestest"
 
+[features]
+default = []
+bin = ["iced", "rand"]
+
 [dependencies]
 anyhow = "1"
+iced = { version = "0.14", features = ["canvas", "smol"], optional = true }
+rand = { version = "0.8", optional = true }
