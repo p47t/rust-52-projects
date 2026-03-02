@@ -6,7 +6,12 @@ description = "NES 2A03 CPU emulator that passes nestest"
 
 [features]
 default = []
-bin = ["iced", "rand"]
+demos = ["iced", "rand"]
+
+[[bin]]
+name = "snake"
+path = "demos/snake/main.rs"
+required-features = ["demos"]
 
 [dependencies]
 anyhow = "1"

@@ -1,4 +1,4 @@
-#![cfg(feature = "bin")]
+#![cfg(feature = "demos")]
 
 use iced::event::{self, Event};
 use iced::keyboard::{self, Key};
@@ -17,7 +17,6 @@ const GRID_SIZE: usize = 32;
 const SCREEN_START: u16 = 0x0200;
 const SCREEN_LEN: usize = GRID_SIZE * GRID_SIZE;
 
-/// CPU instructions to execute per game tick.
 const STEPS_PER_TICK: usize = 100;
 
 #[rustfmt::skip]
@@ -122,21 +121,18 @@ impl App {
                 let last_key = self.last_key;
                 let mut rng = rand::thread_rng();
 
-                // Inject input and randomness, then run a batch of CPU steps
                 self.cpu.bus.write(0xFF, last_key);
                 self.cpu.bus.write(0xFE, rng.gen_range(1..16));
 
                 for _ in 0..STEPS_PER_TICK {
                     self.cpu.step();
 
-                    // BRK (opcode 0x00) signals game over
                     if self.cpu.bus.read(self.cpu.pc) == 0x00 {
                         self.game_over = true;
                         break;
                     }
                 }
 
-                // Read screen memory and redraw if changed
                 let mut changed = false;
                 for i in 0..SCREEN_LEN {
                     let val = self.cpu.bus.read(SCREEN_START + i as u16);
