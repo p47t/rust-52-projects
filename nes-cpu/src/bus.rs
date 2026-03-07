@@ -13,6 +13,8 @@ pub mod addr {
     pub const APU_IO_END: u16 = 0x5FFF;
 
     pub const OAM_DMA: u16 = 0x4014;
+    pub const JOYPAD1: u16 = 0x4016;
+    pub const JOYPAD2: u16 = 0x4017;
 
     pub const PRG_RAM_START: u16 = 0x6000;
     pub const PRG_RAM_END: u16 = 0x7FFF;
@@ -54,6 +56,13 @@ impl Bus {
             addr::IO_START..=addr::IO_END => {
                 if let Some(io) = &mut self.io {
                     io.read(addr::IO_START + (addr & addr::IO_MASK))
+                } else {
+                    0xFF
+                }
+            }
+            addr::JOYPAD1 | addr::JOYPAD2 => {
+                if let Some(io) = &mut self.io {
+                    io.read(addr)
                 } else {
                     0xFF
                 }
@@ -100,6 +109,11 @@ impl Bus {
             addr::OAM_DMA => {
                 if let Some(io) = &mut self.io {
                     io.write(addr::OAM_DMA, val);
+                }
+            }
+            addr::JOYPAD1 => {
+                if let Some(io) = &mut self.io {
+                    io.write(addr, val);
                 }
             }
             addr::PRG_RAM_START..=addr::PRG_RAM_END => {

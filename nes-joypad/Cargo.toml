@@ -1,0 +1,22 @@
+[package]
+name = "nes-joypad"
+version = "0.1.0"
+edition = "2021"
+description = "NES joypad emulation with keyboard and gamepad input"
+
+[features]
+default = []
+demos = ["minifb", "gamepad"]
+gamepad = ["gilrs"]
+
+[[bin]]
+name = "nes-play"
+path = "demos/play/main.rs"
+required-features = ["demos"]
+
+[dependencies]
+nes-cpu = { path = "../nes-cpu" }
+nes-ppu = { path = "../nes-ppu" }
+anyhow = "1"
+minifb = { version = "0.27", optional = true }
+gilrs = { version = "0.11", optional = true, default-features = false, features = ["xinput"] }
