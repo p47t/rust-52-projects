@@ -50,7 +50,12 @@ impl System {
         }
         ppu_cycles.set(reset_ppu_dots);
 
-        Self { cpu, ppu, cpu_cycles, ppu_cycles }
+        Self {
+            cpu,
+            ppu,
+            cpu_cycles,
+            ppu_cycles,
+        }
     }
 
     /// Step one CPU instruction, ticking PPU via catch-up.
@@ -98,6 +103,17 @@ impl System {
         }
 
         total_cpu_cycles
+    }
+
+    /// Run CPU/PPU until the PPU completes a frame (VBlank begins).
+    pub fn run_until_frame(&mut self) {
+        loop {
+            self.step();
+            if self.ppu.borrow().frame_ready {
+                self.ppu.borrow_mut().frame_ready = false;
+                return;
+            }
+        }
     }
 
     fn handle_dma(&mut self) -> u64 {

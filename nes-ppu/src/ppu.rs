@@ -25,7 +25,7 @@ pub mod registers {
 }
 
 /// PPUCTRL ($2000) bit flags.
-/// 
+///
 /// 7  bit  0
 /// ---- ----
 /// VPHB SINN
@@ -44,11 +44,14 @@ pub mod registers {
 pub mod ctrl {
     pub const NAMETABLE_SELECT: u8 = 0b0000_0011;
     pub const VRAM_INCREMENT: u8 = 0b0000_0100;
+    pub const SPRITE_PATTERN: u8 = 0b0000_1000;
+    pub const BG_PATTERN: u8 = 0b0001_0000;
+    pub const SPRITE_SIZE: u8 = 0b0010_0000;
     pub const NMI_ENABLE: u8 = 0b1000_0000;
 }
 
 /// PPUMASK ($2001) bit flags.
-/// 
+///
 /// 7  bit  0
 /// ---- ----
 /// BGRs bMmG
@@ -62,6 +65,8 @@ pub mod ctrl {
 /// |+-------- Emphasize green (red on PAL/Dendy)
 /// +--------- Emphasize blue
 pub mod mask {
+    pub const SHOW_BG_LEFT: u8 = 0b0000_0010;
+    pub const SHOW_SPR_LEFT: u8 = 0b0000_0100;
     pub const SHOW_BG: u8 = 0b0000_1000;
     pub const SHOW_SPRITES: u8 = 0b0001_0000;
     pub const RENDERING: u8 = SHOW_BG | SHOW_SPRITES;
@@ -97,6 +102,27 @@ pub mod timing {
     /// Dot where per-scanline events fire (flag set/clear).
     pub const EVENT_DOT: u16 = 1;
 }
+
+/// Canonical NES 2C02 system palette: 64 colors as 0x00RRGGBB.
+#[rustfmt::skip]
+pub const NES_PALETTE: [u32; 64] = [
+    0x00666666, 0x00002A88, 0x001412A7, 0x003B00A4,
+    0x005C007E, 0x006E0040, 0x006C0600, 0x00561D00,
+    0x00333500, 0x000B4800, 0x00005200, 0x00004F08,
+    0x0000404D, 0x00000000, 0x00000000, 0x00000000,
+    0x00ADADAD, 0x00155FD9, 0x004240FF, 0x007527FE,
+    0x00A01ACC, 0x00B71E7B, 0x00B53120, 0x00994E00,
+    0x006B6D00, 0x00388700, 0x000C9300, 0x00008F32,
+    0x00007C8D, 0x00000000, 0x00000000, 0x00000000,
+    0x00FFFEFF, 0x0064B0FF, 0x009290FF, 0x00C676FF,
+    0x00F36AFF, 0x00FE6ECC, 0x00FE8170, 0x00EA9E22,
+    0x00BCBE00, 0x0088D800, 0x005CE430, 0x0045E082,
+    0x0048CDDE, 0x004F4F4F, 0x00000000, 0x00000000,
+    0x00FFFEFF, 0x00C0DFFF, 0x00D3D2FF, 0x00E8C8FF,
+    0x00FBC2FF, 0x00FEC4EA, 0x00FECCC5, 0x00F7D8A5,
+    0x00E4E594, 0x00CFEF96, 0x00BDF4AB, 0x00B3F3CC,
+    0x00B5EBF2, 0x00B8B8B8, 0x00000000, 0x00000000,
+];
 
 pub struct Ppu {
     // Control registers
@@ -156,10 +182,39 @@ pub struct Ppu {
 
     // Mirroring
     pub mirroring: Mirroring,
+
+    // Rendering pipeline
+    pub framebuffer: Box<[u32; 256 * 240]>,
+    pub frame_ready: bool,
+
+    // Background shift registers
+    bg_pattern_lo: u16,
+    bg_pattern_hi: u16,
+    bg_attr_lo: u16,
+    bg_attr_hi: u16,
+
+    // Background tile fetch latches
+    bg_next_tile_id: u8,
+    bg_next_attr: u8,
+    bg_next_pattern_lo: u8,
+    bg_next_pattern_hi: u8,
+
+    // Sprite evaluation state (for current scanline)
+    sprite_scanline: [(u8, u8, u8, u8); 8], // (y, tile, attr, x)
+    sprite_count: u8,
+    sprite_pattern_lo: [u8; 8],
+    sprite_pattern_hi: [u8; 8],
+    sprite_zero_on_line: bool,
 }
 
 impl Ppu {
     pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
+        // If no CHR-ROM provided, allocate 8KB CHR-RAM
+        let chr_rom = if chr_rom.is_empty() {
+            vec![0u8; 8192]
+        } else {
+            chr_rom
+        };
         Self {
             ctrl: 0,
             mask: 0,
@@ -187,6 +242,21 @@ impl Ppu {
             suppress_vbl: false,
             dma_page: None,
             mirroring,
+            framebuffer: Box::new([0u32; 256 * 240]),
+            frame_ready: false,
+            bg_pattern_lo: 0,
+            bg_pattern_hi: 0,
+            bg_attr_lo: 0,
+            bg_attr_hi: 0,
+            bg_next_tile_id: 0,
+            bg_next_attr: 0,
+            bg_next_pattern_lo: 0,
+            bg_next_pattern_hi: 0,
+            sprite_scanline: [(0, 0, 0, 0); 8],
+            sprite_count: 0,
+            sprite_pattern_lo: [0; 8],
+            sprite_pattern_hi: [0; 8],
+            sprite_zero_on_line: false,
         }
     }
 
@@ -194,7 +264,10 @@ impl Ppu {
 
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
-            registers::CTRL | registers::MASK | registers::OAM_ADDR | registers::SCROLL
+            registers::CTRL
+            | registers::MASK
+            | registers::OAM_ADDR
+            | registers::SCROLL
             | registers::ADDR => self.data_bus,
 
             registers::STATUS => {
@@ -269,10 +342,7 @@ impl Ppu {
                 // Age-based NMI cancellation: if NMI was just disabled and
                 // VBlank set the NMI within the last few PPU ticks, the CPU
                 // hasn't polled it yet (penultimate cycle) so we can cancel.
-                if was_output && !self.nmi_output
-                    && self.nmi_pending
-                    && self.nmi_pending_age < 3
-                {
+                if was_output && !self.nmi_output && self.nmi_pending && self.nmi_pending_age < 3 {
                     self.nmi_pending = false;
                 }
                 // Register-write-triggered NMI: delay by 1 instruction.
@@ -387,6 +457,48 @@ impl Ppu {
             }
         }
 
+        // ── Rendering ────────────────────────────────────────────────────
+        let visible = self.scanline >= 0 && self.scanline <= 239;
+        let prerender = self.scanline == timing::PRERENDER_LINE;
+
+        if (visible || prerender) && self.rendering_enabled() {
+            // Pixel output (dots 1-256 on visible scanlines only)
+            if visible && self.dot >= 1 && self.dot <= 256 {
+                self.render_pixel();
+            }
+
+            // Background tile fetch (dots 1-256 and 321-336)
+            if (self.dot >= 1 && self.dot <= 256) || (self.dot >= 321 && self.dot <= 336) {
+                self.update_bg_shifters();
+                match self.dot % 8 {
+                    1 => self.fetch_nametable_byte(),
+                    3 => self.fetch_attribute_byte(),
+                    5 => self.fetch_pattern_lo(),
+                    7 => self.fetch_pattern_hi(),
+                    0 => self.load_bg_shifters(),
+                    _ => {}
+                }
+            }
+
+            // Scroll register updates
+            if self.dot == 256 {
+                self.increment_scroll_y();
+            }
+            if self.dot == 257 {
+                self.copy_horizontal_bits();
+            }
+            if prerender && self.dot >= 280 && self.dot <= 304 {
+                self.copy_vertical_bits();
+            }
+
+            // Sprite evaluation at dot 257 of visible scanlines
+            if self.dot == 257 && visible {
+                self.evaluate_sprites();
+            }
+        }
+
+        // ── Timing events ───────────────────────────────────────────────
+
         // Pre-render scanline (261): clear flags at dot 1
         if self.scanline == timing::PRERENDER_LINE && self.dot == timing::EVENT_DOT {
             self.status &= !status::FLAGS; // clear VBlank, sprite 0, overflow
@@ -396,6 +508,7 @@ impl Ppu {
 
         // Scanline 241 (start of VBlank): set flag at dot 1
         if self.scanline == timing::VBLANK_LINE && self.dot == timing::EVENT_DOT {
+            self.frame_ready = true;
             if self.suppress_vbl {
                 // VBlank suppressed: $2002 was read on the exact cycle before
                 // VBlank would be set. On real hardware this race condition
@@ -450,6 +563,253 @@ impl Ppu {
             return true;
         }
         false
+    }
+
+    // ── Rendering pipeline ─────────────────────────────────────────────────
+
+    fn render_pixel(&mut self) {
+        let x = (self.dot - 1) as usize;
+        let y = self.scanline as usize;
+
+        // Background pixel
+        let (bg_pixel, bg_palette) =
+            if self.mask & mask::SHOW_BG != 0 && (x >= 8 || self.mask & mask::SHOW_BG_LEFT != 0) {
+                let bit_select = 15 - self.fine_x as u16;
+                let lo = (self.bg_pattern_lo >> bit_select) & 1;
+                let hi = (self.bg_pattern_hi >> bit_select) & 1;
+                let pixel = ((hi << 1) | lo) as u8;
+                let attr_lo = (self.bg_attr_lo >> bit_select) & 1;
+                let attr_hi = (self.bg_attr_hi >> bit_select) & 1;
+                let palette = ((attr_hi << 1) | attr_lo) as u8;
+                (pixel, palette)
+            } else {
+                (0, 0)
+            };
+
+        // Sprite pixel
+        let mut spr_pixel = 0u8;
+        let mut spr_palette = 0u8;
+        let mut spr_priority = false;
+        let mut spr_zero = false;
+        if self.mask & mask::SHOW_SPRITES != 0 && (x >= 8 || self.mask & mask::SHOW_SPR_LEFT != 0) {
+            for i in 0..self.sprite_count as usize {
+                let sx = self.sprite_scanline[i].3 as usize;
+                if x < sx || x >= sx + 8 {
+                    continue;
+                }
+                let col = (x - sx) as u8;
+                let lo = (self.sprite_pattern_lo[i] >> (7 - col)) & 1;
+                let hi = (self.sprite_pattern_hi[i] >> (7 - col)) & 1;
+                let pixel = (hi << 1) | lo;
+                if pixel == 0 {
+                    continue;
+                }
+                spr_pixel = pixel;
+                spr_palette = (self.sprite_scanline[i].2 & 0x03) + 4;
+                spr_priority = self.sprite_scanline[i].2 & 0x20 != 0;
+                spr_zero = i == 0 && self.sprite_zero_on_line;
+                break;
+            }
+        }
+
+        // Priority multiplexer
+        let (final_pixel, final_palette) = match (bg_pixel, spr_pixel) {
+            (0, 0) => (0u8, 0u8),
+            (0, _) => (spr_pixel, spr_palette),
+            (_, 0) => (bg_pixel, bg_palette),
+            (_, _) => {
+                if spr_zero && x != 255 {
+                    self.status |= status::SPRITE0_HIT;
+                }
+                if spr_priority {
+                    (bg_pixel, bg_palette)
+                } else {
+                    (spr_pixel, spr_palette)
+                }
+            }
+        };
+
+        let color_idx = if final_pixel == 0 {
+            self.palette[0] as usize & 0x3F
+        } else {
+            self.palette[(final_palette as usize * 4 + final_pixel as usize) & 0x1F] as usize & 0x3F
+        };
+
+        self.framebuffer[y * 256 + x] = NES_PALETTE[color_idx];
+    }
+
+    // ── Background tile fetch ────────────────────────────────────────────
+
+    fn update_bg_shifters(&mut self) {
+        if self.mask & mask::SHOW_BG != 0 {
+            self.bg_pattern_lo <<= 1;
+            self.bg_pattern_hi <<= 1;
+            self.bg_attr_lo <<= 1;
+            self.bg_attr_hi <<= 1;
+        }
+    }
+
+    fn load_bg_shifters(&mut self) {
+        self.bg_pattern_lo = (self.bg_pattern_lo & 0xFF00) | self.bg_next_pattern_lo as u16;
+        self.bg_pattern_hi = (self.bg_pattern_hi & 0xFF00) | self.bg_next_pattern_hi as u16;
+        let attr_lo_fill: u16 = if self.bg_next_attr & 0x01 != 0 {
+            0xFF
+        } else {
+            0x00
+        };
+        let attr_hi_fill: u16 = if self.bg_next_attr & 0x02 != 0 {
+            0xFF
+        } else {
+            0x00
+        };
+        self.bg_attr_lo = (self.bg_attr_lo & 0xFF00) | attr_lo_fill;
+        self.bg_attr_hi = (self.bg_attr_hi & 0xFF00) | attr_hi_fill;
+        self.increment_coarse_x();
+    }
+
+    fn fetch_nametable_byte(&mut self) {
+        let addr = 0x2000 | (self.v & 0x0FFF);
+        self.bg_next_tile_id = self.vram_read(addr);
+    }
+
+    fn fetch_attribute_byte(&mut self) {
+        let addr = 0x23C0 | (self.v & 0x0C00) | ((self.v >> 4) & 0x38) | ((self.v >> 2) & 0x07);
+        let attr = self.vram_read(addr);
+        let shift = (((self.v >> 4) & 0x04) | (self.v & 0x02)) as u8;
+        self.bg_next_attr = (attr >> shift) & 0x03;
+    }
+
+    fn fetch_pattern_lo(&mut self) {
+        let table: u16 = if self.ctrl & ctrl::BG_PATTERN != 0 {
+            0x1000
+        } else {
+            0
+        };
+        let fine_y = (self.v >> 12) & 0x07;
+        let addr = table + (self.bg_next_tile_id as u16) * 16 + fine_y;
+        self.bg_next_pattern_lo = self.vram_read(addr);
+    }
+
+    fn fetch_pattern_hi(&mut self) {
+        let table: u16 = if self.ctrl & ctrl::BG_PATTERN != 0 {
+            0x1000
+        } else {
+            0
+        };
+        let fine_y = (self.v >> 12) & 0x07;
+        let addr = table + (self.bg_next_tile_id as u16) * 16 + fine_y + 8;
+        self.bg_next_pattern_hi = self.vram_read(addr);
+    }
+
+    // ── Scroll register helpers (loopy) ──────────────────────────────────
+
+    fn increment_coarse_x(&mut self) {
+        if self.v & 0x001F == 31 {
+            self.v &= !0x001F;
+            self.v ^= 0x0400;
+        } else {
+            self.v += 1;
+        }
+    }
+
+    fn increment_scroll_y(&mut self) {
+        if self.v & 0x7000 != 0x7000 {
+            self.v += 0x1000;
+        } else {
+            self.v &= !0x7000;
+            let mut y = (self.v & 0x03E0) >> 5;
+            if y == 29 {
+                y = 0;
+                self.v ^= 0x0800;
+            } else if y == 31 {
+                y = 0;
+            } else {
+                y += 1;
+            }
+            self.v = (self.v & !0x03E0) | (y << 5);
+        }
+    }
+
+    fn copy_horizontal_bits(&mut self) {
+        self.v = (self.v & !0x041F) | (self.t & 0x041F);
+    }
+
+    fn copy_vertical_bits(&mut self) {
+        self.v = (self.v & !0x7BE0) | (self.t & 0x7BE0);
+    }
+
+    // ── Sprite evaluation ────────────────────────────────────────────────
+
+    fn evaluate_sprites(&mut self) {
+        let sprite_height: i16 = if self.ctrl & ctrl::SPRITE_SIZE != 0 {
+            16
+        } else {
+            8
+        };
+        let scanline = self.scanline;
+
+        self.sprite_count = 0;
+        self.sprite_zero_on_line = false;
+
+        for i in 0..64 {
+            let y = self.oam[i * 4] as i16;
+            let diff = scanline - y;
+            if diff < 0 || diff >= sprite_height {
+                continue;
+            }
+            if self.sprite_count >= 8 {
+                self.status |= status::SPRITE_OVERFLOW;
+                break;
+            }
+
+            let tile_idx = self.oam[i * 4 + 1];
+            let attr = self.oam[i * 4 + 2];
+            let x = self.oam[i * 4 + 3];
+
+            if i == 0 {
+                self.sprite_zero_on_line = true;
+            }
+
+            let flip_v = attr & 0x80 != 0;
+            let mut row = diff as u16;
+
+            let pattern_addr = if sprite_height == 16 {
+                let table = (tile_idx as u16 & 1) * 0x1000;
+                let tile = tile_idx as u16 & 0xFE;
+                if flip_v {
+                    row = 15 - row;
+                }
+                if row >= 8 {
+                    table + (tile + 1) * 16 + (row - 8)
+                } else {
+                    table + tile * 16 + row
+                }
+            } else {
+                let table: u16 = if self.ctrl & ctrl::SPRITE_PATTERN != 0 {
+                    0x1000
+                } else {
+                    0
+                };
+                if flip_v {
+                    row = 7 - row;
+                }
+                table + (tile_idx as u16) * 16 + row
+            };
+
+            let mut lo = self.vram_read(pattern_addr);
+            let mut hi = self.vram_read(pattern_addr + 8);
+
+            if attr & 0x40 != 0 {
+                lo = lo.reverse_bits();
+                hi = hi.reverse_bits();
+            }
+
+            let idx = self.sprite_count as usize;
+            self.sprite_scanline[idx] = (y as u8, tile_idx, attr, x);
+            self.sprite_pattern_lo[idx] = lo;
+            self.sprite_pattern_hi[idx] = hi;
+            self.sprite_count += 1;
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

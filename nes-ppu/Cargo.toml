@@ -4,6 +4,16 @@ version = "0.1.0"
 edition = "2021"
 description = "NES PPU emulator targeting blargg's ppu_vbl_nmi tests"
 
+[features]
+default = []
+demos = ["minifb"]
+
+[[bin]]
+name = "nes-render"
+path = "demos/render/main.rs"
+required-features = ["demos"]
+
 [dependencies]
 nes-cpu = { path = "../nes-cpu" }
 anyhow = "1"
+minifb = { version = "0.27", optional = true }

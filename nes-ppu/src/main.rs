@@ -8,8 +8,8 @@ fn main() -> anyhow::Result<()> {
         .get(1)
         .context("Usage: nes-ppu <rom-path>\n  Place blargg ppu_vbl_nmi ROMs in roms/ directory")?;
 
-    let rom = INesRom::load(rom_path)
-        .with_context(|| format!("Failed to load ROM: {}", rom_path))?;
+    let rom =
+        INesRom::load(rom_path).with_context(|| format!("Failed to load ROM: {}", rom_path))?;
 
     println!("Loaded: {}", rom_path);
     println!(
@@ -55,7 +55,10 @@ fn main() -> anyhow::Result<()> {
                     }
                     return Ok(());
                 } else {
-                    println!("\nFAIL: status=${:02X} (after {} cycles)", status, total_cycles);
+                    println!(
+                        "\nFAIL: status=${:02X} (after {} cycles)",
+                        status, total_cycles
+                    );
                     println!("Message: {}", message);
                     bail!("Test failed with status ${:02X}: {}", status, message);
                 }
