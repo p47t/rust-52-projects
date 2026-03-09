@@ -52,6 +52,9 @@ impl Triangle {
 
     /// Current output sample (0-15).
     pub fn output(&self) -> u8 {
+        if !self.length_counter.is_active() || self.linear_counter == 0 {
+            return 0;
+        }
         TRIANGLE_SEQUENCE[self.sequencer_pos as usize]
     }
 

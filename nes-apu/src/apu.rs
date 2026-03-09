@@ -34,10 +34,21 @@ pub struct Apu {
 
     /// Output buffer of downsampled audio samples (mono, -1.0 to 1.0).
     sample_buffer: Vec<f32>,
+
+    /// First-order high-pass filter state (~37Hz cutoff, removes DC offset).
+    hpf_prev_in: f32,
+    hpf_prev_out: f32,
+    hpf_alpha: f32,
 }
 
 impl Apu {
     pub fn new(sample_rate: f64) -> Self {
+        // First-order high-pass: alpha = RC / (RC + dt)
+        // ~37Hz cutoff: RC = 1/(2*pi*37)
+        let rc = 1.0 / (2.0 * std::f64::consts::PI * 37.0);
+        let dt = 1.0 / sample_rate;
+        let alpha = rc / (rc + dt);
+
         Self {
             pulse1: Pulse::new(NegateMode::OnesComplement),
             pulse2: Pulse::new(NegateMode::TwosComplement),
@@ -51,6 +62,9 @@ impl Apu {
             sample_period: CPU_FREQ / sample_rate,
             sample_counter: 0.0,
             sample_buffer: Vec::with_capacity((sample_rate / 30.0) as usize),
+            hpf_prev_in: 0.0,
+            hpf_prev_out: 0.0,
+            hpf_alpha: alpha as f32,
         }
     }
 
@@ -106,16 +120,20 @@ impl Apu {
         self.pulse2.clock_sweep();
     }
 
-    fn mix_output(&self) -> f32 {
+    fn mix_output(&mut self) -> f32 {
         let p1 = self.pulse1.output();
         let p2 = self.pulse2.output();
         let tri = self.triangle.output();
         let noise = self.noise.output();
         let dmc = self.dmc.output();
 
-        // Mixer produces 0.0-~1.0 range, center around 0 for audio output
         let mixed = self.mixer.mix(p1, p2, tri, noise, dmc);
-        mixed * 2.0 - 1.0 // convert to -1.0..1.0 range
+
+        // High-pass filter to remove DC offset (replicates the real NES ~37Hz HPF)
+        let out = self.hpf_alpha * (self.hpf_prev_out + mixed - self.hpf_prev_in);
+        self.hpf_prev_in = mixed;
+        self.hpf_prev_out = out;
+        out
     }
 
     /// Drain all accumulated audio samples. Call once per frame.
