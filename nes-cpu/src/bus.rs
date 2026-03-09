@@ -1,4 +1,8 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::ines::{INesRom, Mirroring};
+use crate::mapper::Mapper;
 
 /// CPU memory map address constants.
 pub mod addr {
@@ -16,14 +20,11 @@ pub mod addr {
     pub const JOYPAD1: u16 = 0x4016;
     pub const JOYPAD2: u16 = 0x4017;
 
-    pub const PRG_RAM_START: u16 = 0x6000;
-    pub const PRG_RAM_END: u16 = 0x7FFF;
-
-    pub const PRG_ROM_START: u16 = 0x8000;
+    pub const CARTRIDGE_START: u16 = 0x6000;
 }
 
 /// Trait for I/O devices mapped into the CPU address space.
-/// PPU registers ($2000-$3FFF) and OAM DMA ($4014) route through this.
+/// PPU registers ($2000-$3FFF), OAM DMA ($4014), and joypads ($4016/$4017) route through this.
 pub trait BusIo {
     fn read(&mut self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, val: u8);
@@ -31,21 +32,35 @@ pub trait BusIo {
 
 pub struct Bus {
     ram: [u8; 2048],
-    prg_ram: [u8; 8192], // $6000-$7FFF (battery/work RAM, blargg test output)
-    prg_rom: Vec<u8>,
-    pub mirroring: Mirroring,
-    pub mapper: u8,
+    pub mapper: Option<Rc<RefCell<Box<dyn Mapper>>>>,
     pub io: Option<Box<dyn BusIo>>,
 }
 
+impl Default for Bus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Bus {
-    pub fn from_rom(rom: INesRom) -> Self {
+    pub fn new() -> Self {
         Self {
             ram: [0u8; 2048],
-            prg_ram: [0u8; 8192],
+            mapper: None,
+            io: None,
+        }
+    }
+
+    /// Convenience constructor for standalone CPU tests (mapper 0 only).
+    pub fn from_rom(rom: INesRom) -> Self {
+        let mapper = SimpleNrom {
             prg_rom: rom.prg_rom,
+            prg_ram: [0u8; 8192],
             mirroring: rom.mirroring,
-            mapper: rom.mapper,
+        };
+        Self {
+            ram: [0u8; 2048],
+            mapper: Some(Rc::new(RefCell::new(Box::new(mapper) as Box<dyn Mapper>))),
             io: None,
         }
     }
@@ -67,12 +82,12 @@ impl Bus {
                     0xFF
                 }
             }
-            addr::PRG_RAM_START..=addr::PRG_RAM_END => {
-                self.prg_ram[(addr - addr::PRG_RAM_START) as usize]
-            }
-            addr::PRG_ROM_START..=0xFFFF => {
-                let offset = (addr - addr::PRG_ROM_START) as usize % self.prg_rom.len();
-                self.prg_rom[offset]
+            addr::CARTRIDGE_START..=0xFFFF => {
+                if let Some(m) = &self.mapper {
+                    m.borrow().read_prg(addr)
+                } else {
+                    0xFF
+                }
             }
             _ => 0xFF, // open bus
         }
@@ -84,13 +99,9 @@ impl Bus {
         match addr {
             addr::RAM_START..=addr::RAM_END => self.ram[(addr & addr::RAM_MASK) as usize],
             addr::IO_START..=addr::APU_IO_END => 0xFF, // I/O — don't trigger side effects
-            addr::PRG_RAM_START..=addr::PRG_RAM_END => {
-                self.prg_ram[(addr - addr::PRG_RAM_START) as usize]
-            }
             _ => {
-                if addr >= addr::PRG_ROM_START {
-                    let offset = (addr - addr::PRG_ROM_START) as usize % self.prg_rom.len();
-                    self.prg_rom[offset]
+                if let Some(m) = &self.mapper {
+                    m.borrow().read_prg(addr)
                 } else {
                     0xFF
                 }
@@ -116,11 +127,50 @@ impl Bus {
                     io.write(addr, val);
                 }
             }
-            addr::PRG_RAM_START..=addr::PRG_RAM_END => {
-                self.prg_ram[(addr - addr::PRG_RAM_START) as usize] = val
+            addr::CARTRIDGE_START..=0xFFFF => {
+                if let Some(m) = &self.mapper {
+                    m.borrow_mut().write_prg(addr, val);
+                }
             }
             _ => {}
         }
+    }
+}
+
+/// Minimal mapper 0 (NROM) for standalone nes-cpu tests.
+/// Only handles PRG; CHR stubs return 0 since CPU tests don't exercise the PPU.
+struct SimpleNrom {
+    prg_rom: Vec<u8>,
+    prg_ram: [u8; 8192],
+    mirroring: Mirroring,
+}
+
+impl Mapper for SimpleNrom {
+    fn read_prg(&self, addr: u16) -> u8 {
+        match addr {
+            0x6000..=0x7FFF => self.prg_ram[(addr - 0x6000) as usize],
+            0x8000..=0xFFFF => {
+                let offset = (addr - 0x8000) as usize % self.prg_rom.len();
+                self.prg_rom[offset]
+            }
+            _ => 0,
+        }
+    }
+
+    fn write_prg(&mut self, addr: u16, val: u8) {
+        if let 0x6000..=0x7FFF = addr {
+            self.prg_ram[(addr - 0x6000) as usize] = val;
+        }
+    }
+
+    fn read_chr(&self, _addr: u16) -> u8 {
+        0
+    }
+
+    fn write_chr(&mut self, _addr: u16, _val: u8) {}
+
+    fn mirroring(&self) -> Mirroring {
+        self.mirroring
     }
 }
 

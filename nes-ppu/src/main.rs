@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         rom.mirroring
     );
 
-    let mut sys = System::from_rom(rom);
+    let mut sys = System::from_rom(rom)?;
 
     // Blargg test protocol:
     //   $6000 = status: $80 = running, $00 = pass, $01+ = specific failure

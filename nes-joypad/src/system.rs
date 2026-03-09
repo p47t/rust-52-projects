@@ -4,6 +4,7 @@ use std::rc::Rc;
 use nes_cpu::bus::Bus;
 use nes_cpu::cpu::Cpu;
 use nes_cpu::ines::INesRom;
+use nes_cpu::mapper::Mapper;
 use nes_ppu::bus_io::PpuBusIo;
 use nes_ppu::ppu::Ppu;
 
@@ -21,12 +22,13 @@ pub struct System {
 }
 
 impl System {
-    pub fn from_rom(rom: INesRom) -> Self {
-        let chr_rom = rom.chr_rom.clone();
-        let mirroring = rom.mirroring;
+    pub fn from_rom(rom: INesRom) -> anyhow::Result<Self> {
+        let mapper: Rc<RefCell<Box<dyn Mapper>>> =
+            Rc::new(RefCell::new(nes_mapper::from_rom(&rom)?));
 
-        let mut bus = Bus::from_rom(rom);
-        let ppu = Rc::new(RefCell::new(Ppu::new(chr_rom, mirroring)));
+        let mut bus = Bus::new();
+        bus.mapper = Some(Rc::clone(&mapper));
+        let ppu = Rc::new(RefCell::new(Ppu::new(Rc::clone(&mapper))));
         let cpu_cycles = Rc::new(Cell::new(0u64));
         let ppu_cycles = Rc::new(Cell::new(0u64));
         let joypad1 = Rc::new(RefCell::new(Joypad::new()));
@@ -57,14 +59,14 @@ impl System {
         }
         ppu_cycles.set(reset_ppu_dots);
 
-        Self {
+        Ok(Self {
             cpu,
             ppu,
             joypad1,
             joypad2,
             cpu_cycles,
             ppu_cycles,
-        }
+        })
     }
 
     /// Step one CPU instruction, ticking PPU via catch-up.

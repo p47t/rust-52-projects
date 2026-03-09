@@ -3,6 +3,8 @@ pub enum Mirroring {
     Horizontal,
     Vertical,
     FourScreen,
+    SingleScreenLower,
+    SingleScreenUpper,
 }
 
 #[derive(Debug)]

@@ -25,9 +25,7 @@ fn main() -> anyhow::Result<()> {
         rom.mapper,
         rom.mirroring
     );
-    anyhow::ensure!(rom.mapper == 0, "Only mapper 0 (NROM) is supported");
-
-    let mut sys = System::from_rom(rom);
+    let mut sys = System::from_rom(rom)?;
 
     #[cfg(feature = "gamepad")]
     let mut gilrs_ctx = match gilrs::Gilrs::new() {

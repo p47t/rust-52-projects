@@ -450,7 +450,16 @@ dependencies = [
  "gilrs",
  "minifb",
  "nes-cpu",
+ "nes-mapper",
  "nes-ppu",
+]
+
+[[package]]
+name = "nes-mapper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "nes-cpu",
 ]
 
 [[package]]
@@ -459,6 +468,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "nes-cpu",
+ "nes-mapper",
 ]
 
 [[package]]

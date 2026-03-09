@@ -1,4 +1,8 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use nes_cpu::ines::Mirroring;
+use nes_cpu::mapper::Mapper;
 
 /// PPU memory-mapped registers
 ///
@@ -149,7 +153,7 @@ pub struct Ppu {
     // Memory
     pub vram: [u8; 2048], // 2 nametables
     pub palette: [u8; 32],
-    pub chr_rom: Vec<u8>,
+    pub mapper: Rc<RefCell<Box<dyn Mapper>>>,
 
     // Timing
     pub scanline: i16, // -1 (pre-render) through 260
@@ -180,8 +184,7 @@ pub struct Ppu {
     // DMA
     pub dma_page: Option<u8>,
 
-    // Mirroring
-    pub mirroring: Mirroring,
+    // Mirroring (cached from mapper for nametable address calculation)
 
     // Rendering pipeline
     pub framebuffer: Box<[u32; 256 * 240]>,
@@ -208,13 +211,7 @@ pub struct Ppu {
 }
 
 impl Ppu {
-    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
-        // If no CHR-ROM provided, allocate 8KB CHR-RAM
-        let chr_rom = if chr_rom.is_empty() {
-            vec![0u8; 8192]
-        } else {
-            chr_rom
-        };
+    pub fn new(mapper: Rc<RefCell<Box<dyn Mapper>>>) -> Self {
         Self {
             ctrl: 0,
             mask: 0,
@@ -229,7 +226,7 @@ impl Ppu {
             data_bus: 0,
             vram: [0; 2048],
             palette: [0; 32],
-            chr_rom,
+            mapper,
             scanline: 0,
             dot: 0,
             odd_frame: false,
@@ -241,7 +238,6 @@ impl Ppu {
             nmi_write_delay: 0,
             suppress_vbl: false,
             dma_page: None,
-            mirroring,
             framebuffer: Box::new([0u32; 256 * 240]),
             frame_ready: false,
             bg_pattern_lo: 0,
@@ -833,7 +829,8 @@ impl Ppu {
         let table = addr / 0x400; // 0-3
         let offset = addr % 0x400;
 
-        let mapped = match self.mirroring {
+        let mirroring = self.mapper.borrow().mirroring();
+        let mapped = match mirroring {
             Mirroring::Horizontal => {
                 // Tables 0,1 → physical 0; tables 2,3 → physical 1
                 let physical = if table < 2 { 0 } else { 1 };
@@ -845,6 +842,8 @@ impl Ppu {
                 (physical as usize) * 0x400 + offset as usize
             }
             Mirroring::FourScreen => addr as usize,
+            Mirroring::SingleScreenLower => offset as usize,
+            Mirroring::SingleScreenUpper => 0x400 + offset as usize,
         };
         mapped & 0x7FF // clamp to 2KB VRAM
     }
@@ -852,13 +851,7 @@ impl Ppu {
     fn vram_read(&self, addr: u16) -> u8 {
         let addr = addr & 0x3FFF;
         match addr {
-            0x0000..=0x1FFF => {
-                if (addr as usize) < self.chr_rom.len() {
-                    self.chr_rom[addr as usize]
-                } else {
-                    0
-                }
-            }
+            0x0000..=0x1FFF => self.mapper.borrow().read_chr(addr),
             0x2000..=0x3EFF => {
                 let idx = self.mirror_nametable_addr(addr);
                 self.vram[idx]
@@ -872,10 +865,7 @@ impl Ppu {
         let addr = addr & 0x3FFF;
         match addr {
             0x0000..=0x1FFF => {
-                // CHR-RAM case (if no CHR-ROM)
-                if (addr as usize) < self.chr_rom.len() {
-                    self.chr_rom[addr as usize] = val;
-                }
+                self.mapper.borrow_mut().write_chr(addr, val);
             }
             0x2000..=0x3EFF => {
                 let idx = self.mirror_nametable_addr(addr);
@@ -908,8 +898,20 @@ impl Ppu {
 mod tests {
     use super::*;
 
+    fn make_mapper(mirroring: Mirroring) -> Rc<RefCell<Box<dyn Mapper>>> {
+        use nes_cpu::ines::INesRom;
+        let rom = INesRom {
+            prg_rom: vec![0u8; 0x4000],
+            chr_rom: vec![0u8; 0x2000],
+            mapper: 0,
+            mirroring,
+            has_battery: false,
+        };
+        Rc::new(RefCell::new(nes_mapper::from_rom(&rom).unwrap()))
+    }
+
     fn make_ppu() -> Ppu {
-        Ppu::new(vec![0; 8192], Mirroring::Horizontal)
+        Ppu::new(make_mapper(Mirroring::Horizontal))
     }
 
     #[test]
@@ -1032,7 +1034,7 @@ mod tests {
 
     #[test]
     fn test_vertical_mirroring() {
-        let ppu = Ppu::new(vec![0; 8192], Mirroring::Vertical);
+        let ppu = Ppu::new(make_mapper(Mirroring::Vertical));
         // Nametable 0 ($2000) and nametable 2 ($2800) should mirror
         let idx0 = ppu.mirror_nametable_addr(0x2005);
         let idx2 = ppu.mirror_nametable_addr(0x2805);

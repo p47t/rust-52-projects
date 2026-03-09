@@ -17,6 +17,7 @@ required-features = ["demos"]
 [dependencies]
 nes-cpu = { path = "../nes-cpu" }
 nes-ppu = { path = "../nes-ppu" }
+nes-mapper = { path = "../nes-mapper" }
 anyhow = "1"
 minifb = { version = "0.27", optional = true }
 gilrs = { version = "0.11", optional = true, default-features = false, features = ["xinput"] }

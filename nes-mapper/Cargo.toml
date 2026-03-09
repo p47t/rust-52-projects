@@ -1,0 +1,9 @@
+[package]
+name = "nes-mapper"
+version = "0.1.0"
+edition = "2021"
+description = "NES cartridge mapper implementations (NROM, MMC1, UxROM, CNROM, AxROM)"
+
+[dependencies]
+nes-cpu = { path = "../nes-cpu" }
+anyhow = "1"

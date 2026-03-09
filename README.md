@@ -35,6 +35,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 31. **nes-cpu** (2026-02-27) - NES 2A03 CPU emulator (6502) that passes nestest.nes
 32. **nes-ppu** (2026-03-01) - NES 2C02 PPU emulator with cycle-accurate VBL/NMI timing
 33. **nes-joypad** (2026-03-07) - NES joypad emulation with keyboard and gamepad input
+34. **nes-mapper** (2026-03-08) - NES cartridge mapper implementations (NROM, MMC1, UxROM, CNROM, AxROM)
 
 ## Build Commands
 
@@ -64,7 +65,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 ## Project Categories
 
 **System Programming**: small-os, shell
-**Emulation**: nes-cpu, nes-ppu, nes-joypad
+**Emulation**: nes-cpu, nes-ppu, nes-joypad, nes-mapper
 **Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp
 **Parsers/Encoders**: ebml, clog
 **Utilities**: calculator, count-words, rolldice, plum

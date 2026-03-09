@@ -1,6 +1,7 @@
 pub mod bus;
 pub mod cpu;
 pub mod ines;
+pub mod mapper;
 pub mod opcodes;
 
 #[cfg(test)]
