@@ -75,6 +75,13 @@ impl Bus {
                     0xFF
                 }
             }
+            0x4015 => {
+                if let Some(io) = &mut self.io {
+                    io.read(addr)
+                } else {
+                    0xFF
+                }
+            }
             addr::JOYPAD1 | addr::JOYPAD2 => {
                 if let Some(io) = &mut self.io {
                     io.read(addr)
@@ -122,7 +129,12 @@ impl Bus {
                     io.write(addr::OAM_DMA, val);
                 }
             }
-            addr::JOYPAD1 => {
+            0x4000..=0x4013 | 0x4015 => {
+                if let Some(io) = &mut self.io {
+                    io.write(addr, val);
+                }
+            }
+            addr::JOYPAD1 | addr::JOYPAD2 => {
                 if let Some(io) = &mut self.io {
                     io.write(addr, val);
                 }

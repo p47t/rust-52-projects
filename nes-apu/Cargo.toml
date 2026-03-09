@@ -1,0 +1,25 @@
+[package]
+name = "nes-apu"
+version = "0.1.0"
+edition = "2021"
+description = "NES 2A03 APU emulator with all 5 audio channels"
+
+[features]
+default = []
+demos = ["minifb", "cpal", "nes-joypad/demos", "gamepad"]
+gamepad = ["nes-joypad/gamepad", "gilrs"]
+
+[dependencies]
+nes-cpu = { path = "../nes-cpu" }
+nes-ppu = { path = "../nes-ppu" }
+nes-joypad = { path = "../nes-joypad" }
+nes-mapper = { path = "../nes-mapper" }
+anyhow = "1"
+minifb = { version = "0.27", optional = true }
+cpal = { version = "0.15", optional = true }
+gilrs = { version = "0.11", optional = true, default-features = false, features = ["xinput"] }
+
+[[bin]]
+name = "nes-game"
+path = "demos/play/main.rs"
+required-features = ["demos"]

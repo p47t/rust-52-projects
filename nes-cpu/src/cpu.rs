@@ -101,6 +101,20 @@ impl Cpu {
         self.cycles += 7;
     }
 
+    /// Hardware IRQ — fires only when the I (interrupt disable) flag is clear.
+    pub fn irq(&mut self) {
+        if self.flag_val(flags::I) {
+            return;
+        }
+        self.push16(self.pc);
+        self.push8((self.p & !flags::B) | flags::U);
+        self.flag_set(flags::I);
+        let lo = self.bus.read(0xFFFE) as u16;
+        let hi = self.bus.read(0xFFFF) as u16;
+        self.pc = (hi << 8) | lo;
+        self.cycles += 7;
+    }
+
     pub fn reset(&mut self) {
         let lo = self.bus.read(0xFFFC) as u16;
         let hi = self.bus.read(0xFFFD) as u16;
