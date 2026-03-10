@@ -12,6 +12,7 @@ use crate::ppu::Ppu;
 pub struct System {
     pub cpu: Cpu,
     pub ppu: Rc<RefCell<Ppu>>,
+    mapper: Rc<RefCell<Box<dyn Mapper>>>,
     /// Shared CPU cycle counter — BusIo reads this to catch up the PPU.
     cpu_cycles: Rc<Cell<u64>>,
     /// PPU cycles already ticked — shared with BusIo to track catch-up.
@@ -55,6 +56,7 @@ impl System {
         Ok(Self {
             cpu,
             ppu,
+            mapper,
             cpu_cycles,
             ppu_cycles,
         })
@@ -102,6 +104,14 @@ impl System {
                 ppu.tick();
             }
             self.ppu_cycles.set(target_ppu);
+        }
+
+        // Service pending mapper IRQ (e.g., MMC3 scanline counter)
+        if let Some(irq) = self.mapper.borrow_mut().as_irq() {
+            if irq.take_irq() {
+                self.cpu.irq();
+                self.cpu_cycles.set(self.cpu.cycles);
+            }
         }
 
         total_cpu_cycles

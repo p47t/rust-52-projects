@@ -491,6 +491,15 @@ impl Ppu {
             if self.dot == 257 && visible {
                 self.evaluate_sprites();
             }
+
+            // Clock mapper scanline counter at dot 260 (after BG fetches,
+            // during sprite fetches — the point where A12 transitions on
+            // real hardware for MMC3 and similar mappers).
+            if self.dot == 260 {
+                if let Some(irq) = self.mapper.borrow_mut().as_irq() {
+                    irq.clock_scanline();
+                }
+            }
         }
 
         // ── Timing events ───────────────────────────────────────────────
