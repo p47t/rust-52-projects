@@ -5,7 +5,8 @@ use bevy::prelude::*;
 use cpal::traits::{DeviceTrait, HostTrait};
 use nes_cpu::ines::INesRom;
 
-use crate::video::FramebufferHandle;
+use crate::crt::CrtMaterial;
+use crate::video::{CrtMaterialHandle, FramebufferHandle};
 
 /// Maximum audio buffer size (in samples) to prevent runaway growth.
 const MAX_AUDIO_BUFFER: usize = 8192;
@@ -65,7 +66,9 @@ pub fn run_emulation_frame(
     nes_input: Res<NesInput>,
     audio_buf: Res<AudioBuffer>,
     fb_handle: Res<FramebufferHandle>,
+    crt_handle: Res<CrtMaterialHandle>,
     mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<CrtMaterial>>,
 ) {
     // Feed input
     nes.sys.joypad1.borrow_mut().set_buttons(nes_input.0);
@@ -85,6 +88,9 @@ pub fn run_emulation_frame(
             data[offset + 2] = (pixel & 0xFF) as u8; // B
             data[offset + 3] = 255; // A
         }
+        // Touch the material to force bind group recreation with the updated GpuImage.
+        // Without this, Material2d caches a stale bind group that references a freed GPU texture.
+        let _ = materials.get_mut(&crt_handle.0);
     }
 
     // Feed audio samples to the shared ring buffer

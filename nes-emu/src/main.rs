@@ -1,4 +1,5 @@
 mod audio;
+mod crt;
 mod emulation;
 mod input;
 mod video;
@@ -21,10 +22,15 @@ fn main() {
                 title: "NES Emulator".to_string(),
                 resolution: (768.0, 720.0).into(), // 256*3, 240*3
                 present_mode: PresentMode::AutoVsync,
+                // Transparent window prevents OS from painting a white background
+                // before Bevy's first render. ClearColor::BLACK fills it immediately.
+                transparent: true,
                 ..default()
             }),
             ..default()
         }))
+        .add_plugins(crt::CrtPlugin)
+        .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(RomPath(rom_path))
         .insert_resource(AudioBuffer {
             buffer: Arc::new(Mutex::new(VecDeque::with_capacity(8192))),
