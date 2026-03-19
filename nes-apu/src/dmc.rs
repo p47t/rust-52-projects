@@ -9,7 +9,7 @@ pub struct Dmc {
     pub loop_flag: bool,
     rate_index: u8,
     timer: u16,
-    timer_period: u16,
+    pub timer_period: u16,
 
     // Sample address and length (from registers)
     sample_address: u16,

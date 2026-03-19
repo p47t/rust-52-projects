@@ -77,20 +77,20 @@ impl Apu {
         self.triangle.tick();
         self.dmc.tick();
 
-        // Pulse and noise tick every other CPU cycle
+        // Pulse, noise, and frame counter tick every other CPU cycle (APU rate)
         if self.even_cycle {
             self.pulse1.tick();
             self.pulse2.tick();
             self.noise.tick();
-        }
 
-        // Frame counter tick
-        if let Some(event) = self.frame_counter.tick() {
-            if event.quarter_frame {
-                self.clock_quarter_frame();
-            }
-            if event.half_frame {
-                self.clock_half_frame();
+            // Frame counter sequencer (APU rate — every other CPU cycle)
+            if let Some(event) = self.frame_counter.tick() {
+                if event.quarter_frame {
+                    self.clock_quarter_frame();
+                }
+                if event.half_frame {
+                    self.clock_half_frame();
+                }
             }
         }
 
@@ -195,7 +195,16 @@ impl Apu {
                 self.noise.length_counter.set_enabled(val & 0x08 != 0);
                 self.dmc.set_enabled(val & 0x10 != 0);
             }
-            0x4017 => self.frame_counter.write(val),
+            0x4017 => {
+                if let Some(event) = self.frame_counter.write(val) {
+                    if event.quarter_frame {
+                        self.clock_quarter_frame();
+                    }
+                    if event.half_frame {
+                        self.clock_half_frame();
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -264,5 +273,371 @@ mod tests {
         // Write to frame counter (5-step mode)
         apu.write_register(0x4017, 0x80);
         assert_eq!(apu.frame_counter.mode, crate::frame_counter::Mode::FiveStep);
+    }
+
+    // ---------------------------------------------------------------
+    // blargg apu_test 1: len_ctr — length counter behavior
+    // ---------------------------------------------------------------
+
+    /// Helper: enable a channel, load a length value, tick some cycles.
+    fn setup_pulse1_with_length(apu: &mut Apu, length_index: u8) {
+        apu.write_register(0x4015, 0x01); // enable pulse 1
+        apu.write_register(0x4000, 0x9F); // duty=2, NO halt, constant vol=15
+        apu.write_register(0x4002, 0x80); // timer low (period >= 8)
+        apu.write_register(0x4003, length_index << 3); // length load
+    }
+
+    #[test]
+    fn test_len_ctr_load_and_status() {
+        // blargg 1-len_ctr, code 2: length counter load + $4015 status
+        let mut apu = Apu::new(44100.0);
+        setup_pulse1_with_length(&mut apu, 0x01); // index 1 = 254 half-frames
+        let status = apu.read_register(0x4015);
+        assert!(
+            status & 0x01 != 0,
+            "pulse 1 should be active after length load"
+        );
+    }
+
+    #[test]
+    fn test_len_ctr_expires_over_time() {
+        // blargg 1-len_ctr, code 3: length counter decrements and eventually expires
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4017, 0x40); // 4-step mode, inhibit IRQ (no immediate clock)
+        setup_pulse1_with_length(&mut apu, 0x03); // index 3 = 2 half-frames
+
+        // Length = 2: needs 2 half-frame clocks to expire.
+        // In 4-step mode, half-frames at APU cycles 7457 and 14915.
+        // Tick enough CPU cycles to reach the second half-frame:
+        // 14915 APU cycles * 2 = 29830 CPU cycles, plus margin.
+        for _ in 0..29840 {
+            apu.tick();
+        }
+        let status = apu.read_register(0x4015);
+        assert_eq!(
+            status & 0x01,
+            0,
+            "pulse 1 should have expired after 2 half-frames"
+        );
+    }
+
+    #[test]
+    fn test_len_ctr_five_step_immediate_clock() {
+        // blargg 1-len_ctr, code 4: writing $80 to $4017 clocks length immediately
+        let mut apu = Apu::new(44100.0);
+        setup_pulse1_with_length(&mut apu, 0x03); // index 3 = 2 half-frames
+
+        // Writing $80 to $4017 (5-step mode) should immediately clock half-frame
+        apu.write_register(0x4017, 0x80);
+        // Length was 2, now should be 1 after immediate half-frame clock
+        assert_eq!(apu.pulse1.length_counter.counter, 1);
+    }
+
+    #[test]
+    fn test_len_ctr_four_step_no_immediate_clock() {
+        // blargg 1-len_ctr, code 5: writing $00 to $4017 should NOT clock immediately
+        let mut apu = Apu::new(44100.0);
+        setup_pulse1_with_length(&mut apu, 0x03); // index 3 = 2
+
+        apu.write_register(0x4017, 0x00); // 4-step mode, no immediate clock
+        assert_eq!(
+            apu.pulse1.length_counter.counter, 2,
+            "should not have clocked"
+        );
+    }
+
+    #[test]
+    fn test_len_ctr_disable_clears() {
+        // blargg 1-len_ctr, code 6: disabling via $4015 clears length counter
+        let mut apu = Apu::new(44100.0);
+        setup_pulse1_with_length(&mut apu, 0x01); // index 1 = 254
+        assert!(apu.pulse1.length_counter.is_active());
+
+        apu.write_register(0x4015, 0x00); // disable all channels
+        assert!(!apu.pulse1.length_counter.is_active());
+        assert_eq!(apu.pulse1.length_counter.counter, 0);
+
+        // Re-enabling should NOT restore the counter
+        apu.write_register(0x4015, 0x01);
+        assert_eq!(apu.pulse1.length_counter.counter, 0);
+    }
+
+    #[test]
+    fn test_len_ctr_disabled_prevents_reload() {
+        // blargg 1-len_ctr, code 7: when disabled, length can't reload
+        let mut apu = Apu::new(44100.0);
+        // Do NOT enable pulse 1 via $4015
+        apu.write_register(0x4000, 0xBF);
+        apu.write_register(0x4002, 0x80);
+        apu.write_register(0x4003, 0x08); // try to load length
+        assert_eq!(
+            apu.pulse1.length_counter.counter, 0,
+            "length should not load when channel is disabled"
+        );
+    }
+
+    #[test]
+    fn test_len_ctr_halt_suspends_clock() {
+        // blargg 1-len_ctr, code 8: halt bit suspends length counter clocking
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4015, 0x01);
+        apu.write_register(0x4000, 0xBF | 0x20); // halt bit set
+        apu.write_register(0x4002, 0x80);
+        apu.write_register(0x4003, 0x18); // length load (index 3 = 2)
+        let initial = apu.pulse1.length_counter.counter;
+        assert!(initial > 0);
+
+        // 5-step mode immediate clock — should NOT decrement because halt is set
+        apu.write_register(0x4017, 0x80);
+        assert_eq!(apu.pulse1.length_counter.counter, initial);
+    }
+
+    // ---------------------------------------------------------------
+    // blargg apu_test 2: len_table — verify all 32 length table entries
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_len_table_all_entries() {
+        let expected: [u8; 32] = [
+            10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20,
+            96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
+        ];
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4015, 0x01); // enable pulse 1
+        apu.write_register(0x4000, 0xBF);
+        apu.write_register(0x4002, 0x80);
+
+        for (i, &exp) in expected.iter().enumerate() {
+            apu.write_register(0x4003, (i as u8) << 3);
+            assert_eq!(
+                apu.pulse1.length_counter.counter, exp,
+                "length table index {} should be {}",
+                i, exp
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // blargg apu_test 3: irq_flag — frame IRQ flag behavior
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_irq_flag_not_set_in_mode_40() {
+        // Code 2: flag shouldn't be set in $4017 mode $40 (4-step + irq inhibit)
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4017, 0x40);
+        // Tick through a full 4-step sequence (~29830 CPU cycles)
+        for _ in 0..29840 {
+            apu.tick();
+        }
+        let status = apu.read_register(0x4015);
+        assert_eq!(status & 0x40, 0, "IRQ flag should not be set with inhibit");
+    }
+
+    #[test]
+    fn test_irq_flag_not_set_in_mode_80() {
+        // Code 3: flag shouldn't be set in $4017 mode $80 (5-step)
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4017, 0x80);
+        for _ in 0..37300 {
+            apu.tick();
+        }
+        let status = apu.read_register(0x4015);
+        assert_eq!(
+            status & 0x40,
+            0,
+            "IRQ flag should not be set in 5-step mode"
+        );
+    }
+
+    #[test]
+    fn test_irq_flag_set_in_mode_00() {
+        // Code 4: flag should be set in $4017 mode $00 (4-step, no inhibit)
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4017, 0x00);
+        // Tick through a full 4-step sequence
+        for _ in 0..29840 {
+            apu.tick();
+        }
+        let status = apu.read_register(0x4015);
+        assert!(status & 0x40 != 0, "IRQ flag should be set in 4-step mode");
+    }
+
+    #[test]
+    fn test_irq_flag_cleared_by_read() {
+        // Code 5: reading $4015 clears the frame IRQ flag
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4017, 0x00);
+        for _ in 0..29840 {
+            apu.tick();
+        }
+        let status1 = apu.read_register(0x4015);
+        assert!(status1 & 0x40 != 0, "flag should be set first");
+
+        let status2 = apu.read_register(0x4015);
+        assert_eq!(status2 & 0x40, 0, "flag should be cleared after read");
+    }
+
+    #[test]
+    fn test_irq_flag_write_00_80_no_effect() {
+        // Code 6: writing $00 or $80 to $4017 should not clear existing flag
+        let mut apu = Apu::new(44100.0);
+        apu.frame_counter.irq_flag = true;
+
+        apu.write_register(0x4017, 0x00);
+        assert!(apu.frame_counter.irq_flag, "$00 should not clear IRQ flag");
+
+        apu.write_register(0x4017, 0x80);
+        assert!(apu.frame_counter.irq_flag, "$80 should not clear IRQ flag");
+    }
+
+    #[test]
+    fn test_irq_flag_write_40_c0_clears() {
+        // Code 7: writing $40 or $C0 to $4017 (irq_inhibit set) should clear flag
+        let mut apu = Apu::new(44100.0);
+        apu.frame_counter.irq_flag = true;
+        apu.write_register(0x4017, 0x40);
+        assert!(!apu.frame_counter.irq_flag, "$40 should clear IRQ flag");
+
+        apu.frame_counter.irq_flag = true;
+        apu.write_register(0x4017, 0xC0);
+        assert!(!apu.frame_counter.irq_flag, "$C0 should clear IRQ flag");
+    }
+
+    // ---------------------------------------------------------------
+    // blargg apu_test 7: dmc_basics — DMC functionality
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_dmc_enable_disable_status() {
+        // DMC enable/disable reflected in $4015
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4012, 0x00); // sample addr
+        apu.write_register(0x4013, 0x01); // sample length = 17
+
+        apu.write_register(0x4015, 0x10); // enable DMC
+        let status = apu.read_register(0x4015);
+        assert!(status & 0x10 != 0, "DMC should show active in $4015");
+
+        apu.write_register(0x4015, 0x00); // disable DMC
+        let status = apu.read_register(0x4015);
+        assert_eq!(status & 0x10, 0, "DMC should show inactive after disable");
+    }
+
+    #[test]
+    fn test_dmc_irq_flag_cleared_on_4015_write() {
+        let mut apu = Apu::new(44100.0);
+        apu.dmc.irq_flag = true;
+        assert!(apu.irq_pending());
+
+        apu.write_register(0x4015, 0x00); // any write to $4015 clears DMC IRQ
+        assert!(!apu.dmc.irq_flag);
+    }
+
+    #[test]
+    fn test_dmc_direct_load() {
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4011, 0x55); // direct load = 0x55
+        assert_eq!(apu.dmc.output(), 0x55);
+    }
+
+    #[test]
+    fn test_dmc_irq_disabled_clears_flag() {
+        // Writing to $4010 with bit 7 clear should clear DMC IRQ flag
+        let mut apu = Apu::new(44100.0);
+        apu.dmc.irq_flag = true;
+        apu.write_register(0x4010, 0x00); // irq_enabled = false
+        assert!(!apu.dmc.irq_flag);
+    }
+
+    #[test]
+    fn test_dmc_restart_on_enable() {
+        // Enabling DMC when bytes_remaining == 0 should restart playback
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4012, 0x02); // sample addr = $C080
+        apu.write_register(0x4013, 0x01); // sample length = 17
+        apu.write_register(0x4015, 0x10); // enable DMC
+        assert_eq!(apu.dmc.bytes_remaining(), 17);
+    }
+
+    #[test]
+    fn test_dmc_no_restart_when_already_playing() {
+        // Enabling DMC when bytes_remaining > 0 should NOT restart
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4012, 0x00);
+        apu.write_register(0x4013, 0x02); // length = 33
+        apu.write_register(0x4015, 0x10); // enable, starts with 33
+        assert_eq!(apu.dmc.bytes_remaining(), 33);
+
+        // Simulate some bytes consumed
+        apu.dmc.load_sample(0xFF);
+        let remaining_after = apu.dmc.bytes_remaining();
+        assert!(remaining_after < 33);
+
+        // Re-enable: should NOT restart since bytes_remaining > 0
+        apu.write_register(0x4015, 0x10);
+        assert_eq!(apu.dmc.bytes_remaining(), remaining_after);
+    }
+
+    // ---------------------------------------------------------------
+    // blargg apu_test 8: dmc_rates — verify all 16 DMC rate entries
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_dmc_rate_table() {
+        let expected: [u16; 16] = [
+            428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
+        ];
+        let mut apu = Apu::new(44100.0);
+        for (i, &exp) in expected.iter().enumerate() {
+            apu.write_register(0x4010, i as u8);
+            assert_eq!(
+                apu.dmc.timer_period, exp,
+                "DMC rate index {} should be {}",
+                i, exp
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Additional correctness: all 4 channels share length counter behavior
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_all_channels_length_counter_status() {
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4015, 0x0F); // enable pulse1, pulse2, triangle, noise
+        apu.write_register(0x4003, 0x08); // pulse1 length
+        apu.write_register(0x4007, 0x08); // pulse2 length
+        apu.write_register(0x400B, 0x08); // triangle length
+        apu.write_register(0x400F, 0x08); // noise length
+
+        let status = apu.read_register(0x4015);
+        assert_eq!(status & 0x0F, 0x0F, "all 4 channels should be active");
+
+        // Disable all
+        apu.write_register(0x4015, 0x00);
+        let status = apu.read_register(0x4015);
+        assert_eq!(status & 0x0F, 0x00, "all 4 channels should be inactive");
+    }
+
+    #[test]
+    fn test_five_step_clocks_all_channels() {
+        // Writing $80 to $4017 should clock length counters for ALL channels
+        let mut apu = Apu::new(44100.0);
+        apu.write_register(0x4015, 0x0F);
+        // Load length index 3 = 2 for all channels
+        apu.write_register(0x4003, 0x18); // pulse1
+        apu.write_register(0x4007, 0x18); // pulse2
+        apu.write_register(0x400B, 0x18); // triangle
+        apu.write_register(0x400F, 0x18); // noise
+
+        apu.write_register(0x4017, 0x80); // 5-step: immediate clock
+
+        // All should have decremented from 2 to 1
+        assert_eq!(apu.pulse1.length_counter.counter, 1);
+        assert_eq!(apu.pulse2.length_counter.counter, 1);
+        assert_eq!(apu.triangle.length_counter.counter, 1);
+        assert_eq!(apu.noise.length_counter.counter, 1);
     }
 }

@@ -51,10 +51,11 @@ impl Triangle {
     }
 
     /// Current output sample (0-15).
+    ///
+    /// On real hardware, the triangle DAC always outputs the current sequencer
+    /// position. The length counter and linear counter only gate sequencer
+    /// advancement (handled in `tick()`), they do not silence the output.
     pub fn output(&self) -> u8 {
-        if !self.length_counter.is_active() || self.linear_counter == 0 {
-            return 0;
-        }
         TRIANGLE_SEQUENCE[self.sequencer_pos as usize]
     }
 
@@ -123,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn test_silenced_by_linear_counter() {
+    fn test_gated_by_linear_counter() {
         let mut t = Triangle::new();
         t.length_counter.enable();
         t.write_reg(3, 0x08); // load length
@@ -132,5 +133,7 @@ mod tests {
         t.tick();
         // Sequencer should NOT advance when linear counter is 0
         assert_eq!(t.sequencer_pos, pos_before);
+        // But output should still reflect current sequencer position (not silenced)
+        assert_eq!(t.output(), TRIANGLE_SEQUENCE[pos_before as usize]);
     }
 }
