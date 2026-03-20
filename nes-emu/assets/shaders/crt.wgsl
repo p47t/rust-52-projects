@@ -68,11 +68,11 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     // Sample the NES framebuffer
     var color = textureSample(source_texture, source_sampler, uv).rgb;
 
-    // Apply scanlines
-    color *= scanline(uv, scanline_intensity);
-
-    // Apply shadow mask
-    color *= shadow_mask(uv);
+    // Apply CRT effects only when enabled (scanline_intensity > 0 signals CRT mode)
+    if scanline_intensity > 0.0 {
+        color *= scanline(uv, scanline_intensity);
+        color *= shadow_mask(uv);
+    }
 
     // Apply vignette
     color *= vignette(uv, vignette_intensity);

@@ -46,8 +46,11 @@ pub fn setup_video(
     let mat_handle = materials.add(CrtMaterial::new(handle));
     commands.insert_resource(CrtMaterialHandle(mat_handle.clone()));
 
-    // 2D camera
-    commands.spawn(Camera2d);
+    // 2D camera, offset left so game is centered in the non-panel area
+    commands.spawn((
+        Camera2d,
+        Transform::from_xyz(crate::debug_ui::PANEL_WIDTH / 2.0, 0.0, 0.0),
+    ));
 
     // Quad with CRT material
     commands.spawn((

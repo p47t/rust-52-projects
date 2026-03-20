@@ -1,5 +1,6 @@
 mod audio;
 mod crt;
+mod debug_ui;
 mod emulation;
 mod input;
 mod video;
@@ -20,7 +21,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "NES Emulator".to_string(),
-                resolution: (768.0, 720.0).into(), // 256*3, 240*3
+                resolution: (768.0 + debug_ui::PANEL_WIDTH, 720.0).into(),
                 present_mode: PresentMode::AutoVsync,
                 // Transparent window prevents OS from painting a white background
                 // before Bevy's first render. ClearColor::BLACK fills it immediately.
@@ -30,6 +31,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(crt::CrtPlugin)
+        .add_plugins(debug_ui::DebugUiPlugin)
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(RomPath(rom_path))
         .insert_resource(AudioBuffer {
