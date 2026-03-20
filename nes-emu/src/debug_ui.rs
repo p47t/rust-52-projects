@@ -5,7 +5,7 @@ use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy::image::{ImageSampler, ImageSamplerDescriptor};
 
 use crate::crt::CrtMaterial;
-use crate::emulation::NesSystem;
+use crate::emulation::{CartridgeInfo, NesInput, NesSystem};
 use crate::video::{CrtMaterialHandle, FramebufferHandle};
 
 /// Width of the debug side panel in logical pixels.
@@ -59,8 +59,10 @@ fn toggle_debug_ui(keys: Res<ButtonInput<KeyCode>>, mut visible: ResMut<DebugUiV
 fn draw_debug_ui(
     visible: Res<DebugUiVisible>,
     nes: NonSend<NesSystem>,
+    cart: Res<CartridgeInfo>,
     crt_handle: Res<CrtMaterialHandle>,
     mut materials: ResMut<Assets<CrtMaterial>>,
+    nes_input: Res<NesInput>,
     mut filter: ResMut<VideoFilter>,
     mut contexts: EguiContexts,
     time: Res<Time>,
@@ -75,9 +77,19 @@ fn draw_debug_ui(
         .exact_width(PANEL_WIDTH)
         .resizable(false)
         .show(ctx, |ui| {
-            // FPS
+            ui.heading("Play");
             let fps = 1.0 / time.delta_secs();
             ui.label(format!("FPS: {fps:.1}"));
+            ui.separator();
+
+            // Cartridge info
+            ui.heading("Cartridge");
+            ui.monospace(&cart.file_name);
+            ui.monospace(format!("PRG: {}KB  CHR: {}KB", cart.prg_kb, cart.chr_kb));
+            ui.monospace(format!("Mapper: {}  {}", cart.mapper, cart.mirroring));
+            if cart.battery {
+                ui.monospace("Battery: yes");
+            }
             ui.separator();
 
             // CPU registers
@@ -112,6 +124,53 @@ fn draw_debug_ui(
                 ppu.ctrl, ppu.mask, ppu.status
             ));
             drop(ppu);
+            ui.separator();
+
+            // APU state
+            ui.heading("APU");
+            let apu = nes.sys.apu.borrow();
+            ui.monospace(format!(
+                "P1:{:>4} L:{:>2}  P2:{:>4} L:{:>2}",
+                apu.pulse1.timer_period,
+                apu.pulse1.length_counter.counter,
+                apu.pulse2.timer_period,
+                apu.pulse2.length_counter.counter,
+            ));
+            ui.monospace(format!(
+                "Tri:{:>4} L:{:>2}  Noi: L:{:>2}",
+                apu.triangle.timer_period,
+                apu.triangle.length_counter.counter,
+                apu.noise.length_counter.counter,
+            ));
+            ui.monospace(format!(
+                "DMC: lvl:{:>3} {}",
+                apu.dmc.output_level,
+                if apu.dmc.enabled { "ON" } else { "OFF" },
+            ));
+            drop(apu);
+            ui.separator();
+
+            // Joypad state
+            ui.heading("Joypad");
+            let btns = nes_input.0;
+            let btn_str = |bit: u8, name: &str| -> String {
+                if btns & (1 << bit) != 0 {
+                    name.to_uppercase()
+                } else {
+                    ".".to_string()
+                }
+            };
+            ui.monospace(format!(
+                "{}  {}  {}  {}  {}  {}  {}  {}",
+                btn_str(0, "A"),
+                btn_str(1, "B"),
+                btn_str(2, "Sel"),
+                btn_str(3, "Sta"),
+                btn_str(4, "U"),
+                btn_str(5, "D"),
+                btn_str(6, "L"),
+                btn_str(7, "R"),
+            ));
             ui.separator();
 
             // Video filter selection

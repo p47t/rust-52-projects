@@ -31,12 +31,28 @@ pub struct AudioBuffer {
 #[derive(Resource, Default)]
 pub struct NesInput(pub u8);
 
+/// Cartridge metadata extracted from the iNES ROM header.
+#[derive(Resource)]
+pub struct CartridgeInfo {
+    pub file_name: String,
+    pub prg_kb: usize,
+    pub chr_kb: usize,
+    pub mapper: u8,
+    pub mirroring: String,
+    pub battery: bool,
+}
+
 /// Exclusive startup system that creates the NES system as a non-send resource.
 pub fn setup_emulation(world: &mut World) {
     let rom_path = world.resource::<RomPath>().0.clone();
     let rom = INesRom::load(&rom_path).unwrap_or_else(|e| {
         panic!("Failed to load ROM '{}': {}", rom_path, e);
     });
+
+    let file_name = std::path::Path::new(&rom_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| rom_path.clone());
 
     println!("Loaded: {}", rom_path);
     println!(
@@ -46,6 +62,15 @@ pub fn setup_emulation(world: &mut World) {
         rom.mapper,
         rom.mirroring
     );
+
+    world.insert_resource(CartridgeInfo {
+        file_name,
+        prg_kb: rom.prg_rom.len() / 1024,
+        chr_kb: rom.chr_rom.len() / 1024,
+        mapper: rom.mapper,
+        mirroring: format!("{:?}", rom.mirroring),
+        battery: rom.has_battery,
+    });
 
     // Query the audio device sample rate for APU downsampling
     let sample_rate = cpal::default_host()
