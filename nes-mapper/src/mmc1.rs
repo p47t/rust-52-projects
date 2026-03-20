@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::Mapper;
+use nes_cpu::state::*;
 
 /// Mapper 1 (MMC1/SxROM): Serial shift register for PRG/CHR banking and mirroring.
 ///
@@ -169,6 +170,37 @@ impl Mapper for Mmc1 {
             2 => Mirroring::Vertical,
             _ => Mirroring::Horizontal,
         }
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bytes(&mut out, &self.prg_ram);
+        if self.chr_ram {
+            write_bytes(&mut out, &self.chr);
+        }
+        write_u8(&mut out, self.shift);
+        write_u8(&mut out, self.shift_count);
+        write_u8(&mut out, self.control);
+        write_u8(&mut out, self.chr_bank_0);
+        write_u8(&mut out, self.chr_bank_1);
+        write_u8(&mut out, self.prg_bank);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let ram = read_bytes(&mut cursor);
+        self.prg_ram.copy_from_slice(&ram);
+        if self.chr_ram {
+            let chr = read_bytes(&mut cursor);
+            self.chr.copy_from_slice(&chr);
+        }
+        self.shift = read_u8(&mut cursor);
+        self.shift_count = read_u8(&mut cursor);
+        self.control = read_u8(&mut cursor);
+        self.chr_bank_0 = read_u8(&mut cursor);
+        self.chr_bank_1 = read_u8(&mut cursor);
+        self.prg_bank = read_u8(&mut cursor);
     }
 }
 

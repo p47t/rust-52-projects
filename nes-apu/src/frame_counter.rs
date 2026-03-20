@@ -64,6 +64,28 @@ impl FrameCounter {
         }
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_u8(out, if self.mode == Mode::FourStep { 0 } else { 1 });
+        write_bool(out, self.irq_inhibit);
+        write_bool(out, self.irq_flag);
+        write_u16(out, self.cycle);
+        write_bool(out, self.new_sequence_irq);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.mode = if read_u8(cursor) == 0 {
+            Mode::FourStep
+        } else {
+            Mode::FiveStep
+        };
+        self.irq_inhibit = read_bool(cursor);
+        self.irq_flag = read_bool(cursor);
+        self.cycle = read_u16(cursor);
+        self.new_sequence_irq = read_bool(cursor);
+    }
+
     /// Write $4017 frame counter register.
     ///
     /// Returns `Some(event)` if an immediate clock should fire (5-step mode).

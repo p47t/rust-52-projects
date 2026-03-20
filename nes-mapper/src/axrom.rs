@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::Mapper;
+use nes_cpu::state::*;
 
 /// Mapper 7 (AxROM): 32KB PRG bank switching + single-screen mirroring control.
 /// CHR-RAM only.
@@ -56,6 +57,22 @@ impl Mapper for AxRom {
 
     fn mirroring(&self) -> Mirroring {
         self.mirroring
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bytes(&mut out, &self.chr_ram);
+        write_u8(&mut out, self.prg_bank as u8);
+        write_mirroring(&mut out, self.mirroring);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let chr = read_bytes(&mut cursor);
+        self.chr_ram.copy_from_slice(&chr);
+        self.prg_bank = read_u8(&mut cursor) as usize;
+        self.mirroring = read_mirroring(&mut cursor);
     }
 }
 

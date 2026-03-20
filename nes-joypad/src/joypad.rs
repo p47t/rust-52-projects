@@ -69,6 +69,25 @@ impl Joypad {
         }
     }
 
+    pub fn save_state(&self) -> Vec<u8> {
+        use nes_cpu::state::*;
+        let mut out = Vec::new();
+        write_u8(&mut out, self.button_state);
+        write_u8(&mut out, self.shift_register);
+        write_u8(&mut out, self.read_index);
+        write_bool(&mut out, self.strobe);
+        out
+    }
+
+    pub fn load_state(&mut self, data: &[u8]) {
+        use nes_cpu::state::*;
+        let mut cursor = data;
+        self.button_state = read_u8(&mut cursor);
+        self.shift_register = read_u8(&mut cursor);
+        self.read_index = read_u8(&mut cursor);
+        self.strobe = read_bool(&mut cursor);
+    }
+
     /// Handle $4016/$4017 read. Returns one button bit per call.
     /// While strobe is high, continuously returns the A button state.
     /// After 8 reads, returns 1 (open bus for standard controller).

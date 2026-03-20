@@ -1,8 +1,9 @@
+use std::time::SystemTime;
+
+use bevy::image::{ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use bevy_egui::{EguiContexts, EguiPlugin};
-
-use bevy::image::{ImageSampler, ImageSamplerDescriptor};
 
 use crate::crt::CrtMaterial;
 use crate::emulation::{CartridgeInfo, NesInput, NesSystem};
@@ -10,6 +11,12 @@ use crate::video::{CrtMaterialHandle, FramebufferHandle};
 
 /// Width of the debug side panel in logical pixels.
 pub const PANEL_WIDTH: f32 = 250.0;
+
+/// Holds the in-memory save state (single slot).
+#[derive(Resource, Default)]
+pub struct SaveSlot {
+    pub data: Option<Vec<u8>>,
+}
 
 #[derive(Resource, Default, PartialEq, Eq, Clone, Copy)]
 pub enum VideoFilter {
@@ -29,8 +36,21 @@ impl std::fmt::Display for VideoFilter {
     }
 }
 
+#[derive(Event)]
+struct SaveStateEvent;
+
+#[derive(Event)]
+struct LoadStateEvent;
+
 #[derive(Resource)]
 struct DebugUiVisible(bool);
+
+#[derive(Resource, Default)]
+struct FpsDisplay {
+    value: f32,
+    elapsed: f32,
+    frames: u32,
+}
 
 pub struct DebugUiPlugin;
 
@@ -39,13 +59,18 @@ impl Plugin for DebugUiPlugin {
         app.add_plugins(EguiPlugin)
             .insert_resource(DebugUiVisible(true))
             .init_resource::<VideoFilter>()
+            .init_resource::<FpsDisplay>()
+            .init_resource::<SaveSlot>()
+            .add_event::<SaveStateEvent>()
+            .add_event::<LoadStateEvent>()
             .add_systems(Update, toggle_debug_ui)
             .add_systems(
                 Update,
                 (draw_debug_ui, apply_video_filter)
                     .chain()
                     .after(toggle_debug_ui),
-            );
+            )
+            .add_systems(Update, handle_save_load.after(draw_debug_ui));
     }
 }
 
@@ -60,15 +85,43 @@ fn draw_debug_ui(
     visible: Res<DebugUiVisible>,
     nes: NonSend<NesSystem>,
     cart: Res<CartridgeInfo>,
+    fb_handle: Res<FramebufferHandle>,
+    images: Res<Assets<Image>>,
     crt_handle: Res<CrtMaterialHandle>,
     mut materials: ResMut<Assets<CrtMaterial>>,
     nes_input: Res<NesInput>,
     mut filter: ResMut<VideoFilter>,
     mut contexts: EguiContexts,
     time: Res<Time>,
+    mut fps_display: ResMut<FpsDisplay>,
+    save_slot: Res<SaveSlot>,
+    mut save_events: EventWriter<SaveStateEvent>,
+    mut load_events: EventWriter<LoadStateEvent>,
+    keys: Res<ButtonInput<KeyCode>>,
 ) {
+    // Keyboard shortcuts work even when panel is hidden
+    let sav_path = save_state_path(&cart);
+    let can_load = save_slot.data.is_some() || sav_path.exists();
+    if keys.just_pressed(KeyCode::F5) {
+        save_events.send(SaveStateEvent);
+    }
+    if keys.just_pressed(KeyCode::F7) && can_load {
+        load_events.send(LoadStateEvent);
+    }
+    if keys.just_pressed(KeyCode::F12) {
+        save_screenshot(&fb_handle, &images);
+    }
+
     if !visible.0 {
         return;
+    }
+
+    fps_display.elapsed += time.delta_secs();
+    fps_display.frames += 1;
+    if fps_display.elapsed >= 1.0 {
+        fps_display.value = fps_display.frames as f32 / fps_display.elapsed;
+        fps_display.elapsed = 0.0;
+        fps_display.frames = 0;
     }
 
     let ctx = contexts.ctx_mut();
@@ -78,8 +131,20 @@ fn draw_debug_ui(
         .resizable(false)
         .show(ctx, |ui| {
             ui.heading("Play");
-            let fps = 1.0 / time.delta_secs();
-            ui.label(format!("FPS: {fps:.1}"));
+            ui.label(format!("FPS: {:.1}", fps_display.value));
+            if ui.button("Screenshot (F12)").clicked() {
+                save_screenshot(&fb_handle, &images);
+            }
+            ui.horizontal(|ui| {
+                if ui.button("Save (F5)").clicked() {
+                    save_events.send(SaveStateEvent);
+                }
+                ui.add_enabled_ui(can_load, |ui| {
+                    if ui.button("Load (F7)").clicked() {
+                        load_events.send(LoadStateEvent);
+                    }
+                });
+            });
             ui.separator();
 
             // Cartridge info
@@ -248,6 +313,79 @@ fn apply_video_filter(
                 mat.params.blue = 0.6;
                 mat.params.alpha = 1.3;
             }
+        }
+    }
+}
+
+fn save_screenshot(fb_handle: &FramebufferHandle, images: &Assets<Image>) {
+    let Some(image) = images.get(&fb_handle.0) else {
+        eprintln!("Screenshot: framebuffer not available");
+        return;
+    };
+
+    let width = image.width();
+    let height = image.height();
+
+    let Some(buf) = image::RgbaImage::from_raw(width, height, image.data.clone()) else {
+        eprintln!("Screenshot: failed to create image buffer");
+        return;
+    };
+
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let path = format!("screenshot_{timestamp}.png");
+    match buf.save(&path) {
+        Ok(()) => println!("Screenshot saved: {path}"),
+        Err(e) => eprintln!("Screenshot failed: {e}"),
+    }
+}
+
+fn save_state_path(cart: &CartridgeInfo) -> std::path::PathBuf {
+    let stem = std::path::Path::new(&cart.file_name)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unknown".to_string());
+    std::path::PathBuf::from(format!("{stem}.sav"))
+}
+
+fn handle_save_load(
+    mut nes: NonSendMut<NesSystem>,
+    cart: Res<CartridgeInfo>,
+    mut save_slot: ResMut<SaveSlot>,
+    mut save_events: EventReader<SaveStateEvent>,
+    mut load_events: EventReader<LoadStateEvent>,
+) {
+    let path = save_state_path(&cart);
+
+    for _ in save_events.read() {
+        let data = crate::save_state::save(&nes);
+        let size = data.len();
+        match std::fs::write(&path, &data) {
+            Ok(()) => println!("State saved to {} ({} bytes)", path.display(), size),
+            Err(e) => eprintln!("Failed to save state: {e}"),
+        }
+        save_slot.data = Some(data);
+    }
+
+    for _ in load_events.read() {
+        // Try loading from memory first, then from file
+        let data = if let Some(data) = &save_slot.data {
+            data.clone()
+        } else {
+            match std::fs::read(&path) {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("Failed to read state file: {e}");
+                    return;
+                }
+            }
+        };
+        match crate::save_state::load(&mut nes, &data) {
+            Ok(()) => println!("State loaded from {}", path.display()),
+            Err(e) => eprintln!("Failed to load state: {e}"),
         }
     }
 }

@@ -209,6 +209,42 @@ impl Apu {
         }
     }
 
+    pub fn save_state(&self) -> Vec<u8> {
+        use nes_cpu::state::*;
+        let mut out = Vec::new();
+        self.pulse1.save_state(&mut out);
+        self.pulse2.save_state(&mut out);
+        self.triangle.save_state(&mut out);
+        self.noise.save_state(&mut out);
+        self.dmc.save_state(&mut out);
+        self.frame_counter.save_state(&mut out);
+        write_u64(&mut out, self.cycle);
+        write_bool(&mut out, self.even_cycle);
+        write_f64(&mut out, self.sample_counter);
+        // HPF state
+        write_f32(&mut out, self.hpf_prev_in);
+        write_f32(&mut out, self.hpf_prev_out);
+        out
+    }
+
+    pub fn load_state(&mut self, data: &[u8]) {
+        use nes_cpu::state::*;
+        let mut cursor = data;
+        self.pulse1.load_state(&mut cursor);
+        self.pulse2.load_state(&mut cursor);
+        self.triangle.load_state(&mut cursor);
+        self.noise.load_state(&mut cursor);
+        self.dmc.load_state(&mut cursor);
+        self.frame_counter.load_state(&mut cursor);
+        self.cycle = read_u64(&mut cursor);
+        self.even_cycle = read_bool(&mut cursor);
+        self.sample_counter = read_f64(&mut cursor);
+        self.hpf_prev_in = read_f32(&mut cursor);
+        self.hpf_prev_out = read_f32(&mut cursor);
+        // Clear transient state
+        self.sample_buffer.clear();
+    }
+
     /// Returns a pending DMC sample fetch address, if any.
     pub fn dmc_sample_request(&mut self) -> Option<u16> {
         self.dmc.sample_request.take()

@@ -3,6 +3,7 @@ mod crt;
 mod debug_ui;
 mod emulation;
 mod input;
+mod save_state;
 mod video;
 
 use std::collections::VecDeque;
@@ -38,6 +39,7 @@ fn main() {
             buffer: Arc::new(Mutex::new(VecDeque::with_capacity(8192))),
         })
         .init_resource::<NesInput>()
+        .init_resource::<emulation::EmulationTimer>()
         .add_systems(
             Startup,
             (

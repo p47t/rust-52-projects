@@ -54,6 +54,26 @@ impl Envelope {
         }
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_bool(out, self.start);
+        write_bool(out, self.loop_flag);
+        write_bool(out, self.constant_volume);
+        write_u8(out, self.divider_period);
+        write_u8(out, self.divider);
+        write_u8(out, self.decay_level);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.start = read_bool(cursor);
+        self.loop_flag = read_bool(cursor);
+        self.constant_volume = read_bool(cursor);
+        self.divider_period = read_u8(cursor);
+        self.divider = read_u8(cursor);
+        self.decay_level = read_u8(cursor);
+    }
+
     /// Write bits from register 0 of a channel ($4000/$4004/$400C).
     pub fn write(&mut self, val: u8) {
         self.constant_volume = val & 0x10 != 0;

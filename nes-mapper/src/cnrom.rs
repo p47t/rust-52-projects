@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::Mapper;
+use nes_cpu::state::*;
 
 /// Mapper 3 (CNROM): Switchable 8KB CHR-ROM bank, fixed PRG-ROM.
 pub struct Cnrom {
@@ -55,6 +56,17 @@ impl Mapper for Cnrom {
 
     fn mirroring(&self) -> Mirroring {
         self.mirroring
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_u8(&mut out, self.chr_bank as u8);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        self.chr_bank = read_u8(&mut cursor) as usize;
     }
 }
 

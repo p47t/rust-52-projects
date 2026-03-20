@@ -55,6 +55,20 @@ impl LengthCounter {
         self.enabled = true;
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_u8(out, self.counter);
+        write_bool(out, self.halt);
+        write_bool(out, self.enabled);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.counter = read_u8(cursor);
+        self.halt = read_bool(cursor);
+        self.enabled = read_bool(cursor);
+    }
+
     /// Set enabled state from $4015 write. Disabling clears the counter.
     pub fn set_enabled(&mut self, enabled: bool) {
         if enabled {

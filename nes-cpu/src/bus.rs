@@ -65,6 +65,14 @@ impl Bus {
         }
     }
 
+    pub fn ram(&self) -> &[u8; 2048] {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, data: &[u8; 2048]) {
+        self.ram = *data;
+    }
+
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             addr::RAM_START..=addr::RAM_END => self.ram[(addr & addr::RAM_MASK) as usize],
@@ -183,6 +191,18 @@ impl Mapper for SimpleNrom {
 
     fn mirroring(&self) -> Mirroring {
         self.mirroring
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        crate::state::write_bytes(&mut out, &self.prg_ram);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let ram = crate::state::read_bytes(&mut cursor);
+        self.prg_ram.copy_from_slice(&ram);
     }
 }
 

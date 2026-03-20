@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::Mapper;
+use nes_cpu::state::*;
 
 /// Mapper 2 (UxROM): Switchable 16KB PRG bank at $8000, fixed last bank at $C000.
 /// CHR-RAM only (no CHR-ROM banking).
@@ -55,6 +56,20 @@ impl Mapper for UxRom {
 
     fn mirroring(&self) -> Mirroring {
         self.mirroring
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bytes(&mut out, &self.chr_ram);
+        write_u8(&mut out, self.prg_bank as u8);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let chr = read_bytes(&mut cursor);
+        self.chr_ram.copy_from_slice(&chr);
+        self.prg_bank = read_u8(&mut cursor) as usize;
     }
 }
 

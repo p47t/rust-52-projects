@@ -84,6 +84,28 @@ impl Pulse {
         }
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_u8(out, self.duty);
+        write_u16(out, self.timer_period);
+        write_u16(out, self.timer);
+        write_u8(out, self.sequencer_pos);
+        self.envelope.save_state(out);
+        self.length_counter.save_state(out);
+        self.sweep.save_state(out);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.duty = read_u8(cursor);
+        self.timer_period = read_u16(cursor);
+        self.timer = read_u16(cursor);
+        self.sequencer_pos = read_u8(cursor);
+        self.envelope.load_state(cursor);
+        self.length_counter.load_state(cursor);
+        self.sweep.load_state(cursor);
+    }
+
     /// Clock sweep, updating timer_period if needed.
     pub fn clock_sweep(&mut self) {
         if let Some(new_period) = self.sweep.clock(self.timer_period) {

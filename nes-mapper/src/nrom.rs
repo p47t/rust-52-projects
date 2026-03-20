@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::Mapper;
+use nes_cpu::state::*;
 
 /// Mapper 0 (NROM): No bank switching.
 /// - PRG: 16KB (mirrored) or 32KB
@@ -59,6 +60,25 @@ impl Mapper for Nrom {
 
     fn mirroring(&self) -> Mirroring {
         self.mirroring
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bytes(&mut out, &self.prg_ram);
+        if self.chr_ram {
+            write_bytes(&mut out, &self.chr);
+        }
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let ram = read_bytes(&mut cursor);
+        self.prg_ram.copy_from_slice(&ram);
+        if self.chr_ram {
+            let chr = read_bytes(&mut cursor);
+            self.chr.copy_from_slice(&chr);
+        }
     }
 }
 

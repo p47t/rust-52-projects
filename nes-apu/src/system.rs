@@ -87,6 +87,22 @@ impl System {
         })
     }
 
+    pub fn cpu_cycles(&self) -> u64 {
+        self.cpu_cycles.get()
+    }
+
+    pub fn set_cpu_cycles(&self, val: u64) {
+        self.cpu_cycles.set(val);
+    }
+
+    pub fn ppu_cycles(&self) -> u64 {
+        self.ppu_cycles.get()
+    }
+
+    pub fn set_ppu_cycles(&self, val: u64) {
+        self.ppu_cycles.set(val);
+    }
+
     /// Step one CPU instruction, ticking PPU and APU.
     pub fn step(&mut self) -> u64 {
         // Service pending NMI from PPU

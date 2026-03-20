@@ -3,6 +3,7 @@ pub mod cpu;
 pub mod ines;
 pub mod mapper;
 pub mod opcodes;
+pub mod state;
 
 #[cfg(test)]
 mod tests {

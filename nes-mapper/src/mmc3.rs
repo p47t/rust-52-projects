@@ -1,5 +1,6 @@
 use nes_cpu::ines::{INesRom, Mirroring};
 use nes_cpu::mapper::{Mapper, MapperIrq};
+use nes_cpu::state::*;
 
 /// Mapper 4 (MMC3/TxROM): Fine-grained PRG/CHR banking with scanline counter IRQ.
 ///
@@ -231,6 +232,45 @@ impl Mapper for Mmc3 {
 
     fn as_irq(&mut self) -> Option<&mut dyn MapperIrq> {
         Some(self)
+    }
+
+    fn save_state(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_bytes(&mut out, &self.prg_ram);
+        if self.chr_ram {
+            write_bytes(&mut out, &self.chr);
+        }
+        write_u8(&mut out, self.bank_select);
+        for &reg in &self.bank_regs {
+            write_u8(&mut out, reg);
+        }
+        write_mirroring(&mut out, self.mirroring);
+        write_u8(&mut out, self.irq_latch);
+        write_u8(&mut out, self.irq_counter);
+        write_bool(&mut out, self.irq_reload);
+        write_bool(&mut out, self.irq_enabled);
+        write_bool(&mut out, self.irq_pending);
+        out
+    }
+
+    fn load_state(&mut self, data: &[u8]) {
+        let mut cursor = data;
+        let ram = read_bytes(&mut cursor);
+        self.prg_ram.copy_from_slice(&ram);
+        if self.chr_ram {
+            let chr = read_bytes(&mut cursor);
+            self.chr.copy_from_slice(&chr);
+        }
+        self.bank_select = read_u8(&mut cursor);
+        for reg in &mut self.bank_regs {
+            *reg = read_u8(&mut cursor);
+        }
+        self.mirroring = read_mirroring(&mut cursor);
+        self.irq_latch = read_u8(&mut cursor);
+        self.irq_counter = read_u8(&mut cursor);
+        self.irq_reload = read_bool(&mut cursor);
+        self.irq_enabled = read_bool(&mut cursor);
+        self.irq_pending = read_bool(&mut cursor);
     }
 }
 

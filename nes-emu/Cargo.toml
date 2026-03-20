@@ -13,4 +13,5 @@ nes-mapper = { path = "../nes-mapper" }
 bevy = "0.15"
 bevy_egui = "0.33"
 cpal = "0.15"
+image = "0.25"
 anyhow = "1"

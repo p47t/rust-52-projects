@@ -31,6 +31,26 @@ impl Sweep {
         }
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_bool(out, self.enabled);
+        write_u8(out, self.period);
+        write_bool(out, self.negate);
+        write_u8(out, self.shift);
+        write_bool(out, self.reload);
+        write_u8(out, self.divider);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.enabled = read_bool(cursor);
+        self.period = read_u8(cursor);
+        self.negate = read_bool(cursor);
+        self.shift = read_u8(cursor);
+        self.reload = read_bool(cursor);
+        self.divider = read_u8(cursor);
+    }
+
     /// Write the sweep register ($4001/$4005).
     pub fn write(&mut self, val: u8) {
         self.enabled = val & 0x80 != 0;

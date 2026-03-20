@@ -32,4 +32,10 @@ pub trait Mapper {
     fn as_irq(&mut self) -> Option<&mut dyn MapperIrq> {
         None
     }
+
+    /// Serialize all mapper-specific state into a byte blob for save states.
+    fn save_state(&self) -> Vec<u8>;
+
+    /// Restore mapper-specific state from a byte blob produced by `save_state`.
+    fn load_state(&mut self, data: &[u8]);
 }

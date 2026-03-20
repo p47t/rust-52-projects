@@ -901,6 +901,128 @@ impl Ppu {
             _ => idx,
         }
     }
+
+    /// Serialize all PPU state (including private rendering pipeline) for save states.
+    pub fn save_state(&self) -> Vec<u8> {
+        use nes_cpu::state::*;
+        let mut out = Vec::new();
+        // Control registers
+        write_u8(&mut out, self.ctrl);
+        write_u8(&mut out, self.mask);
+        write_u8(&mut out, self.status);
+        write_u8(&mut out, self.oam_addr);
+        write_bytes(&mut out, &self.oam);
+        // Loopy registers
+        write_u16(&mut out, self.v);
+        write_u16(&mut out, self.t);
+        write_u8(&mut out, self.fine_x);
+        write_bool(&mut out, self.addr_latch);
+        write_u8(&mut out, self.read_buffer);
+        write_u8(&mut out, self.data_bus);
+        // Memory
+        write_bytes(&mut out, &self.vram);
+        write_bytes(&mut out, &self.palette);
+        // Timing
+        write_i16(&mut out, self.scanline);
+        write_u16(&mut out, self.dot);
+        write_bool(&mut out, self.odd_frame);
+        // NMI
+        write_bool(&mut out, self.nmi_output);
+        write_bool(&mut out, self.nmi_occurred);
+        write_bool(&mut out, self.nmi_pending);
+        write_bool(&mut out, self.nmi_line);
+        write_u16(&mut out, self.nmi_pending_age);
+        write_u8(&mut out, self.nmi_write_delay);
+        write_bool(&mut out, self.suppress_vbl);
+        // DMA
+        write_bool(&mut out, self.dma_page.is_some());
+        write_u8(&mut out, self.dma_page.unwrap_or(0));
+        write_bool(&mut out, self.frame_ready);
+        // Private rendering pipeline
+        write_u16(&mut out, self.bg_pattern_lo);
+        write_u16(&mut out, self.bg_pattern_hi);
+        write_u16(&mut out, self.bg_attr_lo);
+        write_u16(&mut out, self.bg_attr_hi);
+        write_u8(&mut out, self.bg_next_tile_id);
+        write_u8(&mut out, self.bg_next_attr);
+        write_u8(&mut out, self.bg_next_pattern_lo);
+        write_u8(&mut out, self.bg_next_pattern_hi);
+        write_u8(&mut out, self.sprite_count);
+        for i in 0..8 {
+            let (y, tile, attr, x) = self.sprite_scanline[i];
+            write_u8(&mut out, y);
+            write_u8(&mut out, tile);
+            write_u8(&mut out, attr);
+            write_u8(&mut out, x);
+        }
+        for &b in &self.sprite_pattern_lo {
+            write_u8(&mut out, b);
+        }
+        for &b in &self.sprite_pattern_hi {
+            write_u8(&mut out, b);
+        }
+        write_bool(&mut out, self.sprite_zero_on_line);
+        out
+    }
+
+    /// Restore PPU state from a byte blob produced by `save_state`.
+    pub fn load_state(&mut self, data: &[u8]) {
+        use nes_cpu::state::*;
+        let mut cursor = data;
+        self.ctrl = read_u8(&mut cursor);
+        self.mask = read_u8(&mut cursor);
+        self.status = read_u8(&mut cursor);
+        self.oam_addr = read_u8(&mut cursor);
+        let oam = read_bytes(&mut cursor);
+        self.oam.copy_from_slice(&oam);
+        self.v = read_u16(&mut cursor);
+        self.t = read_u16(&mut cursor);
+        self.fine_x = read_u8(&mut cursor);
+        self.addr_latch = read_bool(&mut cursor);
+        self.read_buffer = read_u8(&mut cursor);
+        self.data_bus = read_u8(&mut cursor);
+        let vram = read_bytes(&mut cursor);
+        self.vram.copy_from_slice(&vram);
+        let palette = read_bytes(&mut cursor);
+        self.palette.copy_from_slice(&palette);
+        self.scanline = read_i16(&mut cursor);
+        self.dot = read_u16(&mut cursor);
+        self.odd_frame = read_bool(&mut cursor);
+        self.nmi_output = read_bool(&mut cursor);
+        self.nmi_occurred = read_bool(&mut cursor);
+        self.nmi_pending = read_bool(&mut cursor);
+        self.nmi_line = read_bool(&mut cursor);
+        self.nmi_pending_age = read_u16(&mut cursor);
+        self.nmi_write_delay = read_u8(&mut cursor);
+        self.suppress_vbl = read_bool(&mut cursor);
+        let has_dma = read_bool(&mut cursor);
+        let dma_val = read_u8(&mut cursor);
+        self.dma_page = if has_dma { Some(dma_val) } else { None };
+        self.frame_ready = read_bool(&mut cursor);
+        self.bg_pattern_lo = read_u16(&mut cursor);
+        self.bg_pattern_hi = read_u16(&mut cursor);
+        self.bg_attr_lo = read_u16(&mut cursor);
+        self.bg_attr_hi = read_u16(&mut cursor);
+        self.bg_next_tile_id = read_u8(&mut cursor);
+        self.bg_next_attr = read_u8(&mut cursor);
+        self.bg_next_pattern_lo = read_u8(&mut cursor);
+        self.bg_next_pattern_hi = read_u8(&mut cursor);
+        self.sprite_count = read_u8(&mut cursor);
+        for i in 0..8 {
+            let y = read_u8(&mut cursor);
+            let tile = read_u8(&mut cursor);
+            let attr = read_u8(&mut cursor);
+            let x = read_u8(&mut cursor);
+            self.sprite_scanline[i] = (y, tile, attr, x);
+        }
+        for b in &mut self.sprite_pattern_lo {
+            *b = read_u8(&mut cursor);
+        }
+        for b in &mut self.sprite_pattern_hi {
+            *b = read_u8(&mut cursor);
+        }
+        self.sprite_zero_on_line = read_bool(&mut cursor);
+    }
 }
 
 #[cfg(test)]

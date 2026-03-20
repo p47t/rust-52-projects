@@ -63,6 +63,26 @@ impl Noise {
         self.envelope.volume()
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_u16(out, self.timer_period);
+        write_u16(out, self.timer);
+        write_u16(out, self.shift_register);
+        write_bool(out, self.mode);
+        self.envelope.save_state(out);
+        self.length_counter.save_state(out);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.timer_period = read_u16(cursor);
+        self.timer = read_u16(cursor);
+        self.shift_register = read_u16(cursor);
+        self.mode = read_bool(cursor);
+        self.envelope.load_state(cursor);
+        self.length_counter.load_state(cursor);
+    }
+
     /// Write to registers $400C-$400F.
     /// `reg` is 0-3 relative to $400C.
     pub fn write_reg(&mut self, reg: u8, val: u8) {

@@ -129,6 +129,50 @@ impl Dmc {
         self.bytes_remaining = self.sample_length;
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_bool(out, self.irq_enabled);
+        write_bool(out, self.loop_flag);
+        write_u8(out, self.rate_index);
+        write_u16(out, self.timer);
+        write_u16(out, self.timer_period);
+        write_u16(out, self.sample_address);
+        write_u16(out, self.sample_length);
+        write_u16(out, self.current_address);
+        write_u16(out, self.bytes_remaining);
+        write_u8(out, self.output_level);
+        write_u8(out, self.shift_register);
+        write_u8(out, self.bits_remaining);
+        write_bool(out, self.silence_flag);
+        write_bool(out, self.sample_buffer.is_some());
+        write_u8(out, self.sample_buffer.unwrap_or(0));
+        write_bool(out, self.irq_flag);
+        write_bool(out, self.enabled);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.irq_enabled = read_bool(cursor);
+        self.loop_flag = read_bool(cursor);
+        self.rate_index = read_u8(cursor);
+        self.timer = read_u16(cursor);
+        self.timer_period = read_u16(cursor);
+        self.sample_address = read_u16(cursor);
+        self.sample_length = read_u16(cursor);
+        self.current_address = read_u16(cursor);
+        self.bytes_remaining = read_u16(cursor);
+        self.output_level = read_u8(cursor);
+        self.shift_register = read_u8(cursor);
+        self.bits_remaining = read_u8(cursor);
+        self.silence_flag = read_bool(cursor);
+        let has_buf = read_bool(cursor);
+        let buf_val = read_u8(cursor);
+        self.sample_buffer = if has_buf { Some(buf_val) } else { None };
+        self.irq_flag = read_bool(cursor);
+        self.enabled = read_bool(cursor);
+        self.sample_request = None;
+    }
+
     /// Write to registers $4010-$4013.
     /// `reg` is 0-3 relative to $4010.
     pub fn write_reg(&mut self, reg: u8, val: u8) {

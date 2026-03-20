@@ -71,6 +71,30 @@ impl Triangle {
         }
     }
 
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        use nes_cpu::state::*;
+        write_u16(out, self.timer_period);
+        write_u16(out, self.timer);
+        write_u8(out, self.sequencer_pos);
+        self.length_counter.save_state(out);
+        write_u8(out, self.linear_counter);
+        write_u8(out, self.linear_counter_reload_value);
+        write_bool(out, self.linear_counter_reload_flag);
+        write_bool(out, self.control_flag);
+    }
+
+    pub fn load_state(&mut self, cursor: &mut &[u8]) {
+        use nes_cpu::state::*;
+        self.timer_period = read_u16(cursor);
+        self.timer = read_u16(cursor);
+        self.sequencer_pos = read_u8(cursor);
+        self.length_counter.load_state(cursor);
+        self.linear_counter = read_u8(cursor);
+        self.linear_counter_reload_value = read_u8(cursor);
+        self.linear_counter_reload_flag = read_bool(cursor);
+        self.control_flag = read_bool(cursor);
+    }
+
     /// Write to registers $4008-$400B.
     /// `reg` is 0-3 relative to $4008.
     pub fn write_reg(&mut self, reg: u8, val: u8) {
