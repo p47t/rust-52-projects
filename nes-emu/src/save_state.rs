@@ -1,128 +1,111 @@
-use nes_cpu::state::*;
+use planus::{ReadAsRoot, WriteAsOffset};
 
 use crate::emulation::NesSystem;
+use crate::generated::{CpuState, NesState, NesStateRef};
 
-/// Magic bytes identifying a save state file.
-const MAGIC: &[u8; 4] = b"NESS";
-/// Save state format version.
-const VERSION: u8 = 1;
-
-/// Capture the entire NES system state into a byte blob.
+/// Capture the entire NES system state into a FlatBuffer byte blob.
 pub fn save(nes: &NesSystem) -> Vec<u8> {
-    let mut out = Vec::with_capacity(64 * 1024);
+    // Collect subsystem blobs using existing save_state() methods
+    let ram = nes.sys.cpu.bus.ram().to_vec();
 
-    // Header
-    out.extend_from_slice(MAGIC);
-    write_u8(&mut out, VERSION);
+    let mapper_blob = nes
+        .sys
+        .cpu
+        .bus
+        .mapper
+        .as_ref()
+        .map(|m| m.borrow().save_state())
+        .unwrap_or_default();
 
-    // CPU
+    let ppu_blob = nes.sys.ppu.borrow().save_state();
+    let apu_blob = nes.sys.apu.borrow().save_state();
+    let jp1_blob = nes.sys.joypad1.borrow().save_state();
+    let jp2_blob = nes.sys.joypad2.borrow().save_state();
+
     let cpu = &nes.sys.cpu;
-    write_u8(&mut out, cpu.a);
-    write_u8(&mut out, cpu.x);
-    write_u8(&mut out, cpu.y);
-    write_u16(&mut out, cpu.pc);
-    write_u8(&mut out, cpu.sp);
-    write_u8(&mut out, cpu.p);
-    write_u64(&mut out, cpu.cycles);
+    let state = NesState {
+        version: 2,
+        cpu: Some(Box::new(CpuState {
+            a: cpu.a,
+            x: cpu.x,
+            y: cpu.y,
+            pc: cpu.pc,
+            sp: cpu.sp,
+            p: cpu.p,
+            cycles: cpu.cycles,
+        })),
+        ram: Some(ram),
+        mapper: Some(mapper_blob),
+        ppu: Some(ppu_blob),
+        apu: Some(apu_blob),
+        joypad1: Some(jp1_blob),
+        joypad2: Some(jp2_blob),
+        cpu_cycles: nes.sys.cpu_cycles(),
+        ppu_cycles: nes.sys.ppu_cycles(),
+    };
 
-    // Bus RAM
-    write_bytes(&mut out, cpu.bus.ram());
-
-    // Mapper
-    if let Some(mapper) = &cpu.bus.mapper {
-        let mapper_state = mapper.borrow().save_state();
-        write_bytes(&mut out, &mapper_state);
-    }
-
-    // PPU
-    let ppu = nes.sys.ppu.borrow();
-    let ppu_state = ppu.save_state();
-    write_bytes(&mut out, &ppu_state);
-    drop(ppu);
-
-    // APU
-    let apu = nes.sys.apu.borrow();
-    let apu_state = apu.save_state();
-    write_bytes(&mut out, &apu_state);
-    drop(apu);
-
-    // Joypads
-    let jp1 = nes.sys.joypad1.borrow();
-    let jp1_state = jp1.save_state();
-    write_bytes(&mut out, &jp1_state);
-    drop(jp1);
-
-    let jp2 = nes.sys.joypad2.borrow();
-    let jp2_state = jp2.save_state();
-    write_bytes(&mut out, &jp2_state);
-    drop(jp2);
-
-    // System cycle counters
-    write_u64(&mut out, nes.sys.cpu_cycles());
-    write_u64(&mut out, nes.sys.ppu_cycles());
-
-    out
+    let mut builder = planus::Builder::new();
+    let offset = state.prepare(&mut builder);
+    builder.finish(offset, None);
+    builder.as_slice().to_vec()
 }
 
-/// Restore the entire NES system state from a byte blob.
-/// Returns an error message on failure.
+/// Restore the entire NES system state from a FlatBuffer byte blob.
 pub fn load(nes: &mut NesSystem, data: &[u8]) -> Result<(), String> {
-    let mut cursor: &[u8] = data;
+    let state = NesStateRef::read_as_root(data).map_err(|e| format!("Invalid save state: {e}"))?;
 
-    // Validate header
-    if cursor.len() < 5 {
-        return Err("Save state too small".to_string());
-    }
-    if &cursor[..4] != MAGIC {
-        return Err("Invalid save state magic".to_string());
-    }
-    cursor = &cursor[4..];
-    let version = read_u8(&mut cursor);
-    if version != VERSION {
-        return Err(format!("Unsupported save state version: {version}"));
-    }
+    let cpu_ref = state
+        .cpu()
+        .map_err(|e| format!("Missing CPU state: {e}"))?
+        .ok_or("No CPU state in save")?;
 
-    // CPU
-    nes.sys.cpu.a = read_u8(&mut cursor);
-    nes.sys.cpu.x = read_u8(&mut cursor);
-    nes.sys.cpu.y = read_u8(&mut cursor);
-    nes.sys.cpu.pc = read_u16(&mut cursor);
-    nes.sys.cpu.sp = read_u8(&mut cursor);
-    nes.sys.cpu.p = read_u8(&mut cursor);
-    nes.sys.cpu.cycles = read_u64(&mut cursor);
+    nes.sys.cpu.a = cpu_ref.a().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.x = cpu_ref.x().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.y = cpu_ref.y().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.pc = cpu_ref.pc().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.sp = cpu_ref.sp().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.p = cpu_ref.p().map_err(|e| format!("{e}"))?;
+    nes.sys.cpu.cycles = cpu_ref.cycles().map_err(|e| format!("{e}"))?;
 
-    // Bus RAM
-    let ram = read_bytes(&mut cursor);
+    // RAM
+    let ram = state
+        .ram()
+        .map_err(|e| format!("Missing RAM: {e}"))?
+        .ok_or("No RAM in save")?;
     if ram.len() != 2048 {
         return Err(format!("Invalid RAM size: {}", ram.len()));
     }
-    let ram_arr: &[u8; 2048] = ram.as_slice().try_into().unwrap();
+    let ram_arr: &[u8; 2048] = ram.try_into().unwrap();
     nes.sys.cpu.bus.set_ram(ram_arr);
 
     // Mapper
-    let mapper_state = read_bytes(&mut cursor);
-    if let Some(mapper) = &nes.sys.cpu.bus.mapper {
-        mapper.borrow_mut().load_state(&mapper_state);
+    if let Some(mapper_data) = state.mapper().map_err(|e| format!("{e}"))? {
+        if let Some(mapper) = &nes.sys.cpu.bus.mapper {
+            mapper.borrow_mut().load_state(mapper_data);
+        }
     }
 
     // PPU
-    let ppu_state = read_bytes(&mut cursor);
-    nes.sys.ppu.borrow_mut().load_state(&ppu_state);
+    if let Some(ppu_data) = state.ppu().map_err(|e| format!("{e}"))? {
+        nes.sys.ppu.borrow_mut().load_state(ppu_data);
+    }
 
     // APU
-    let apu_state = read_bytes(&mut cursor);
-    nes.sys.apu.borrow_mut().load_state(&apu_state);
+    if let Some(apu_data) = state.apu().map_err(|e| format!("{e}"))? {
+        nes.sys.apu.borrow_mut().load_state(apu_data);
+    }
 
     // Joypads
-    let jp1_state = read_bytes(&mut cursor);
-    nes.sys.joypad1.borrow_mut().load_state(&jp1_state);
-
-    let jp2_state = read_bytes(&mut cursor);
-    nes.sys.joypad2.borrow_mut().load_state(&jp2_state);
+    if let Some(jp1_data) = state.joypad1().map_err(|e| format!("{e}"))? {
+        nes.sys.joypad1.borrow_mut().load_state(jp1_data);
+    }
+    if let Some(jp2_data) = state.joypad2().map_err(|e| format!("{e}"))? {
+        nes.sys.joypad2.borrow_mut().load_state(jp2_data);
+    }
 
     // System cycle counters
-    let cpu_cycles = read_u64(&mut cursor);
-    let ppu_cycles = read_u64(&mut cursor);
+    let cpu_cycles = state.cpu_cycles().map_err(|e| format!("{e}"))?;
+    let ppu_cycles = state.ppu_cycles().map_err(|e| format!("{e}"))?;
     nes.sys.set_cpu_cycles(cpu_cycles);
     nes.sys.set_ppu_cycles(ppu_cycles);
 

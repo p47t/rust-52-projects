@@ -1,0 +1,31 @@
+// FlatBuffers schema for NES emulator save states.
+// Regenerate Rust code: planus rust --output src/generated/nes_state_generated.rs schemas/nes_state.fbs
+
+namespace nes_state;
+
+file_identifier "NESF";
+
+table CpuState {
+    a: ubyte;
+    x: ubyte;
+    y: ubyte;
+    pc: ushort;
+    sp: ubyte;
+    p: ubyte;
+    cycles: ulong;
+}
+
+table NesState {
+    version: ubyte = 2;
+    cpu: CpuState;
+    ram: [ubyte];
+    mapper: [ubyte];
+    ppu: [ubyte];
+    apu: [ubyte];
+    joypad1: [ubyte];
+    joypad2: [ubyte];
+    cpu_cycles: ulong;
+    ppu_cycles: ulong;
+}
+
+root_type NesState;

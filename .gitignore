@@ -6,3 +6,5 @@ target
 /.playwright-mcp
 CLAUDE.md
 nes-ppu/games/
+*.sav
+screenshot_*.png

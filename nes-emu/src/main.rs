@@ -2,6 +2,7 @@ mod audio;
 mod crt;
 mod debug_ui;
 mod emulation;
+mod generated;
 mod input;
 mod save_state;
 mod video;
