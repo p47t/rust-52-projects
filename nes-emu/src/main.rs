@@ -23,7 +23,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "NES Emulator".to_string(),
-                resolution: (768.0 + debug_ui::PANEL_WIDTH, 720.0).into(),
+                resolution: ((768.0 + debug_ui::PANEL_WIDTH) as u32, 720u32).into(),
                 present_mode: PresentMode::AutoVsync,
                 // Transparent window prevents OS from painting a white background
                 // before Bevy's first render. ClearColor::BLACK fills it immediately.

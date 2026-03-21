@@ -117,7 +117,13 @@ pub fn run_emulation_frame(
     mut materials: ResMut<Assets<CrtMaterial>>,
     mut timer: ResMut<EmulationTimer>,
     time: Res<Time>,
+    paused: Res<crate::debug_ui::Paused>,
 ) {
+    if paused.0 {
+        // Reset accumulator so we don't "catch up" when unpausing
+        timer.accumulator = 0.0;
+        return;
+    }
     timer.accumulator += time.delta_secs_f64();
 
     // Cap accumulator to prevent spiral of death (e.g. after window drag stall).
@@ -154,13 +160,14 @@ pub fn run_emulation_frame(
         if let Some(image) = images.get_mut(&fb_handle.0) {
             let ppu = nes.sys.ppu.borrow();
             let fb = &*ppu.framebuffer;
-            let data = &mut image.data;
-            for (i, &pixel) in fb.iter().enumerate() {
-                let offset = i * 4;
-                data[offset] = ((pixel >> 16) & 0xFF) as u8; // R
-                data[offset + 1] = ((pixel >> 8) & 0xFF) as u8; // G
-                data[offset + 2] = (pixel & 0xFF) as u8; // B
-                data[offset + 3] = 255; // A
+            if let Some(ref mut data) = image.data {
+                for (i, &pixel) in fb.iter().enumerate() {
+                    let offset = i * 4;
+                    data[offset] = ((pixel >> 16) & 0xFF) as u8; // R
+                    data[offset + 1] = ((pixel >> 8) & 0xFF) as u8; // G
+                    data[offset + 2] = (pixel & 0xFF) as u8; // B
+                    data[offset + 3] = 255; // A
+                }
             }
             // Touch the material to force bind group recreation with the updated GpuImage.
             let _ = materials.get_mut(&crt_handle.0);

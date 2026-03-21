@@ -1,11 +1,12 @@
-use bevy::asset::load_internal_asset;
+use bevy::asset::{load_internal_asset, uuid_handle};
 use bevy::color::LinearRgba;
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, Shader, ShaderRef};
-use bevy::sprite::{Material2d, Material2dPlugin};
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::{Material2d, Material2dPlugin};
 
 /// Shader handle for the embedded CRT shader.
-const CRT_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(0x4E45535F4352545F53484144455201);
+const CRT_SHADER_HANDLE: Handle<Shader> = uuid_handle!("4e455346-4352-545f-5348-414445520100");
 
 /// Bevy plugin that registers the CRT material and its embedded shader.
 pub struct CrtPlugin;

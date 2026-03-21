@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use bevy::image::{ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy_egui::egui;
-use bevy_egui::{EguiContexts, EguiPlugin};
+use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use egui_plot::{Line, PlotPoints};
 
 use crate::crt::CrtMaterial;
@@ -37,11 +37,16 @@ impl std::fmt::Display for VideoFilter {
     }
 }
 
-#[derive(Event)]
-struct SaveStateEvent;
+/// Whether emulation is paused. When paused, CPU/disassembly details are shown.
+#[derive(Resource, Default)]
+pub struct Paused(pub bool);
 
-#[derive(Event)]
-struct LoadStateEvent;
+/// Pending save/load actions communicated between UI and handler systems.
+#[derive(Resource, Default)]
+struct PendingActions {
+    save: bool,
+    load: bool,
+}
 
 #[derive(Resource)]
 struct DebugUiVisible(bool);
@@ -57,27 +62,31 @@ pub struct DebugUiPlugin;
 
 impl Plugin for DebugUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(EguiPlugin)
+        app.add_plugins(EguiPlugin::default())
             .insert_resource(DebugUiVisible(true))
             .init_resource::<VideoFilter>()
             .init_resource::<FpsDisplay>()
             .init_resource::<SaveSlot>()
-            .add_event::<SaveStateEvent>()
-            .add_event::<LoadStateEvent>()
-            .add_systems(Update, toggle_debug_ui)
+            .init_resource::<PendingActions>()
+            .init_resource::<Paused>()
+            .add_systems(Update, (toggle_debug_ui, toggle_pause))
             .add_systems(
-                Update,
-                (draw_debug_ui, apply_video_filter)
-                    .chain()
-                    .after(toggle_debug_ui),
+                EguiPrimaryContextPass,
+                (draw_debug_ui, apply_video_filter).chain(),
             )
-            .add_systems(Update, handle_save_load.after(draw_debug_ui));
+            .add_systems(Update, handle_save_load);
     }
 }
 
 fn toggle_debug_ui(keys: Res<ButtonInput<KeyCode>>, mut visible: ResMut<DebugUiVisible>) {
     if keys.just_pressed(KeyCode::F3) {
         visible.0 = !visible.0;
+    }
+}
+
+fn toggle_pause(keys: Res<ButtonInput<KeyCode>>, mut paused: ResMut<Paused>) {
+    if keys.just_pressed(KeyCode::Escape) {
+        paused.0 = !paused.0;
     }
 }
 
@@ -96,18 +105,18 @@ fn draw_debug_ui(
     time: Res<Time>,
     mut fps_display: ResMut<FpsDisplay>,
     save_slot: Res<SaveSlot>,
-    mut save_events: EventWriter<SaveStateEvent>,
-    mut load_events: EventWriter<LoadStateEvent>,
+    mut pending: ResMut<PendingActions>,
+    paused: Res<Paused>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
     // Keyboard shortcuts work even when panel is hidden
     let sav_path = save_state_path(&cart);
     let can_load = save_slot.data.is_some() || sav_path.exists();
     if keys.just_pressed(KeyCode::F5) {
-        save_events.send(SaveStateEvent);
+        pending.save = true;
     }
     if keys.just_pressed(KeyCode::F7) && can_load {
-        load_events.send(LoadStateEvent);
+        pending.load = true;
     }
     if keys.just_pressed(KeyCode::F12) {
         save_screenshot(&fb_handle, &images);
@@ -125,24 +134,30 @@ fn draw_debug_ui(
         fps_display.frames = 0;
     }
 
-    let ctx = contexts.ctx_mut();
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
 
     egui::SidePanel::right("debug_panel")
         .exact_width(PANEL_WIDTH)
         .resizable(false)
         .show(ctx, |ui| {
-            ui.heading("Play");
+            if paused.0 {
+                ui.heading("PAUSED");
+            } else {
+                ui.heading("Play");
+            }
             ui.label(format!("FPS: {:.1}", fps_display.value));
             if ui.button("Screenshot (F12)").clicked() {
                 save_screenshot(&fb_handle, &images);
             }
             ui.horizontal(|ui| {
                 if ui.button("Save (F5)").clicked() {
-                    save_events.send(SaveStateEvent);
+                    pending.save = true;
                 }
                 ui.add_enabled_ui(can_load, |ui| {
                     if ui.button("Load (F7)").clicked() {
-                        load_events.send(LoadStateEvent);
+                        pending.load = true;
                     }
                 });
             });
@@ -161,20 +176,17 @@ fn draw_debug_ui(
             // CPU registers
             ui.heading("CPU");
             let cpu = &nes.sys.cpu;
-            ui.monospace(format!("A:{:02X}  X:{:02X}  Y:{:02X}", cpu.a, cpu.x, cpu.y));
-            ui.monospace(format!("PC:{:04X}  SP:{:02X}", cpu.pc, cpu.sp));
-
-            // Status flags with colored indicators
-            draw_flags(ui, cpu.p);
-
             ui.monospace(format!("Cycles: {}", cpu.cycles));
-
-            // Mini disassembly: current instruction + next few
-            ui.add_space(2.0);
-            draw_disassembly(ui, cpu);
-
-            // Stack peek
-            draw_stack(ui, cpu);
+            if paused.0 {
+                ui.monospace(format!("A:{:02X}  X:{:02X}  Y:{:02X}", cpu.a, cpu.x, cpu.y));
+                ui.monospace(format!("PC:{:04X}  SP:{:02X}", cpu.pc, cpu.sp));
+                draw_flags(ui, cpu.p);
+                ui.add_space(2.0);
+                draw_disassembly(ui, cpu);
+                draw_stack(ui, cpu);
+            } else {
+                ui.small("Pause (Esc) to inspect registers");
+            }
             ui.separator();
 
             // PPU state
@@ -265,7 +277,7 @@ fn draw_debug_ui(
                         [i as f64, buf[idx] as f64]
                     })
                     .collect();
-                let line = Line::new(points).color(*color);
+                let line = Line::new(*label, points).color(*color);
                 egui_plot::Plot::new(*label)
                     .height(40.0)
                     .show_axes(false)
@@ -396,7 +408,11 @@ fn save_screenshot(fb_handle: &FramebufferHandle, images: &Assets<Image>) {
     let width = image.width();
     let height = image.height();
 
-    let Some(buf) = image::RgbaImage::from_raw(width, height, image.data.clone()) else {
+    let Some(raw_data) = image.data.clone() else {
+        eprintln!("Screenshot: image data not available");
+        return;
+    };
+    let Some(buf) = image::RgbaImage::from_raw(width, height, raw_data) else {
         eprintln!("Screenshot: failed to create image buffer");
         return;
     };
@@ -694,12 +710,12 @@ fn handle_save_load(
     mut nes: NonSendMut<NesSystem>,
     cart: Res<CartridgeInfo>,
     mut save_slot: ResMut<SaveSlot>,
-    mut save_events: EventReader<SaveStateEvent>,
-    mut load_events: EventReader<LoadStateEvent>,
+    mut pending: ResMut<PendingActions>,
 ) {
     let path = save_state_path(&cart);
 
-    for _ in save_events.read() {
+    if pending.save {
+        pending.save = false;
         let data = crate::save_state::save(&nes);
         let size = data.len();
         match std::fs::write(&path, &data) {
@@ -709,7 +725,8 @@ fn handle_save_load(
         save_slot.data = Some(data);
     }
 
-    for _ in load_events.read() {
+    if pending.load {
+        pending.load = false;
         // Try loading from memory first, then from file
         let data = if let Some(data) = &save_slot.data {
             data.clone()
