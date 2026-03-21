@@ -39,6 +39,58 @@ pub struct Apu {
     hpf_prev_in: f32,
     hpf_prev_out: f32,
     hpf_alpha: f32,
+
+    /// Per-channel waveform ring buffers for debug visualization.
+    /// Each stores the raw channel output (0.0-1.0 normalized) at the audio sample rate.
+    pub channel_waveforms: ChannelWaveforms,
+}
+
+/// Per-channel waveform ring buffers for debug visualization.
+pub struct ChannelWaveforms {
+    pub pulse1: WaveformRing,
+    pub pulse2: WaveformRing,
+    pub triangle: WaveformRing,
+    pub noise: WaveformRing,
+    pub dmc: WaveformRing,
+}
+
+impl ChannelWaveforms {
+    fn new() -> Self {
+        Self {
+            pulse1: WaveformRing::new(),
+            pulse2: WaveformRing::new(),
+            triangle: WaveformRing::new(),
+            noise: WaveformRing::new(),
+            dmc: WaveformRing::new(),
+        }
+    }
+}
+
+/// Fixed-size ring buffer holding the most recent waveform samples.
+pub struct WaveformRing {
+    buf: [f32; WaveformRing::CAPACITY],
+    write_pos: usize,
+}
+
+impl WaveformRing {
+    pub const CAPACITY: usize = 1024;
+
+    fn new() -> Self {
+        Self {
+            buf: [0.0; Self::CAPACITY],
+            write_pos: 0,
+        }
+    }
+
+    fn push(&mut self, val: f32) {
+        self.buf[self.write_pos] = val;
+        self.write_pos = (self.write_pos + 1) % Self::CAPACITY;
+    }
+
+    /// Returns samples in chronological order (oldest first).
+    pub fn as_slice_ordered(&self) -> ([f32; Self::CAPACITY], usize) {
+        (self.buf, self.write_pos)
+    }
 }
 
 impl Apu {
@@ -65,6 +117,7 @@ impl Apu {
             hpf_prev_in: 0.0,
             hpf_prev_out: 0.0,
             hpf_alpha: alpha as f32,
+            channel_waveforms: ChannelWaveforms::new(),
         }
     }
 
@@ -98,7 +151,21 @@ impl Apu {
         self.sample_counter += 1.0;
         if self.sample_counter >= self.sample_period {
             self.sample_counter -= self.sample_period;
-            let sample = self.mix_output();
+
+            // Capture per-channel output for waveform visualization
+            let p1 = self.pulse1.output();
+            let p2 = self.pulse2.output();
+            let tri = self.triangle.output();
+            let noise = self.noise.output();
+            let dmc = self.dmc.output();
+
+            self.channel_waveforms.pulse1.push(p1 as f32 / 15.0);
+            self.channel_waveforms.pulse2.push(p2 as f32 / 15.0);
+            self.channel_waveforms.triangle.push(tri as f32 / 15.0);
+            self.channel_waveforms.noise.push(noise as f32 / 15.0);
+            self.channel_waveforms.dmc.push(dmc as f32 / 127.0);
+
+            let sample = self.mix_output_from(p1, p2, tri, noise, dmc);
             self.sample_buffer.push(sample);
         }
     }
@@ -120,13 +187,7 @@ impl Apu {
         self.pulse2.clock_sweep();
     }
 
-    fn mix_output(&mut self) -> f32 {
-        let p1 = self.pulse1.output();
-        let p2 = self.pulse2.output();
-        let tri = self.triangle.output();
-        let noise = self.noise.output();
-        let dmc = self.dmc.output();
-
+    fn mix_output_from(&mut self, p1: u8, p2: u8, tri: u8, noise: u8, dmc: u8) -> f32 {
         let mixed = self.mixer.mix(p1, p2, tri, noise, dmc);
 
         // High-pass filter to remove DC offset (replicates the real NES ~37Hz HPF)
