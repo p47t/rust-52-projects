@@ -1,0 +1,14 @@
+[package]
+name = "qrcode"
+version = "0.1.0"
+authors = ["Patrick Tsai <patrick@simplypatrick.com>"]
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+image = "0.25"
+rqrr = "0.10"
+
+[[bin]]
+name = "qrcode"
+path = "src/main.rs"
