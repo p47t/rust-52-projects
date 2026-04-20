@@ -1,0 +1,11 @@
+[package]
+name = "llm-gguf-parser"
+version = "0.1.0"
+edition = "2021"
+description = "A minimal GGUF model parser for extracting metadata and tensor info"
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.4", features = ["derive"] }
+memmap2 = "0.9.4"
+thiserror = "1.0.61"

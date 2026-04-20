@@ -303,14 +303,14 @@ fn apply_mask(matrix: &mut [Vec<bool>], reserved: &[Vec<bool>], pattern: u8) {
 
 fn mask_applies(pattern: u8, x: usize, y: usize) -> bool {
     match pattern {
-        0 => (x + y) % 2 == 0,
-        1 => y % 2 == 0,
-        2 => x % 3 == 0,
-        3 => (x + y) % 3 == 0,
-        4 => (x / 3 + y / 2) % 2 == 0,
+        0 => (x + y).is_multiple_of(2),
+        1 => y.is_multiple_of(2),
+        2 => x.is_multiple_of(3),
+        3 => (x + y).is_multiple_of(3),
+        4 => (x / 3 + y / 2).is_multiple_of(2),
         5 => ((x * y) % 2 + (x * y) % 3) == 0,
-        6 => (((x * y) % 2 + (x * y) % 3) % 2) == 0,
-        7 => (((x + y) % 2 + (x * y) % 3) % 2) == 0,
+        6 => ((x * y) % 2 + (x * y) % 3).is_multiple_of(2),
+        7 => ((x + y) % 2 + (x * y) % 3).is_multiple_of(2),
         _ => false,
     }
 }
@@ -367,7 +367,7 @@ fn format_bits(ec_level: EcLevel, mask_pattern: u8) -> u16 {
         EcLevel::Q => 0b11,
         EcLevel::H => 0b10,
     };
-    let data = ((ec_bits << 3) | mask_pattern as u16) as u16;
+    let data = (ec_bits << 3) | mask_pattern as u16;
     let mut remainder = data << 10;
     let generator = 0x537u16;
 
@@ -407,7 +407,7 @@ impl BitBuffer {
     }
 
     fn pad_to_byte(&mut self) {
-        while self.bits.len() % 8 != 0 {
+        while !self.bits.len().is_multiple_of(8) {
             self.bits.push(false);
         }
     }

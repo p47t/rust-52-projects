@@ -38,6 +38,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 34. **nes-mapper** (2026-03-08) - NES cartridge mapper implementations (NROM, MMC1, UxROM, CNROM, AxROM)
 35. **nes-apu** (2026-03-09) - NES 2A03 APU emulator with all 5 audio channels and full game demo
 36. **nes-emu** (2026-03-17) - NES emulator frontend using Bevy engine with video, audio, and input
+37. **llm-gguf-parser** (2026-05-20) - GGUF model parser for metadata and tensor info
 
 ## Build Commands
 
@@ -69,7 +70,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 **System Programming**: small-os, shell
 **Emulation**: nes-cpu, nes-ppu, nes-joypad, nes-mapper, nes-apu, nes-emu
 **Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp
-**Parsers/Encoders**: ebml, clog
+**Parsers/Encoders**: ebml, clog, llm-gguf-parser
 **Utilities**: calculator, count-words, rolldice, plum
 **GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
