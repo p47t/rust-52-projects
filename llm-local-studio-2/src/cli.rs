@@ -95,21 +95,33 @@ enum Command {
 impl Command {
     async fn run(self) -> Result<()> {
         match self {
-            Self::Scan { dir } => scan_models(dir),
-            Self::HfSearch { query, limit } => search_hugging_face(query, limit),
+            Self::Scan { dir } => {
+                tokio::task::spawn_blocking(move || scan_models(dir)).await??;
+                Ok(())
+            }
+            Self::HfSearch { query, limit } => {
+                tokio::task::spawn_blocking(move || search_hugging_face(query, limit)).await??;
+                Ok(())
+            }
             Self::HfDownload {
                 name,
                 filename,
                 dir,
                 print_url,
                 force,
-            } => download_hugging_face_model(DownloadRequest {
-                name,
-                filename,
-                models_dir: dir,
-                print_url,
-                force,
-            }),
+            } => {
+                tokio::task::spawn_blocking(move || {
+                    download_hugging_face_model(DownloadRequest {
+                        name,
+                        filename,
+                        models_dir: dir,
+                        print_url,
+                        force,
+                    })
+                })
+                .await??;
+                Ok(())
+            }
             Self::Run {
                 model,
                 prompt,
@@ -117,19 +129,23 @@ impl Command {
                 ctx_size,
                 max_tokens,
             } => {
-                let model_record = resolve_model(&model, dir)?;
-                let mut engine = LlamaCppEngine::new();
-                engine.load_model(LoadModelRequest {
-                    model_id: model_record.id.clone(),
-                    path: model_record.path.clone(),
-                    context_size: Some(ctx_size),
-                })?;
-                engine.run(GenerateRequest {
-                    prompt,
-                    max_tokens,
-                    seed: None,
-                    stream_callback: None,
-                })?;
+                tokio::task::spawn_blocking(move || {
+                    let model_record = resolve_model(&model, dir)?;
+                    let mut engine = LlamaCppEngine::new();
+                    engine.load_model(LoadModelRequest {
+                        model_id: model_record.id.clone(),
+                        path: model_record.path.clone(),
+                        context_size: Some(ctx_size),
+                    })?;
+                    engine.run(GenerateRequest {
+                        prompt,
+                        max_tokens,
+                        seed: None,
+                        stream_callback: None,
+                    })?;
+                    Ok::<(), anyhow::Error>(())
+                })
+                .await??;
                 Ok(())
             }
             Self::Serve {
