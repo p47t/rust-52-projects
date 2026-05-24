@@ -75,7 +75,7 @@ jobs:
                   components: rust-src, rustfmt, clippy
 
             - name: Install system libraries
-              if: contains(fromJson('["libavformat-ffi","media-metadata-explorer","guitar-fretboard","flashcard-app","gpui-calculator","nes-apu"]'), matrix.project)
+              if: contains(fromJson('["libavformat-ffi","media-metadata-explorer","guitar-fretboard","flashcard-app","gpui-calculator","nes-apu","nes-emu"]'), matrix.project)
               run: |
                   sudo apt-get update
                   case "${{ matrix.project }}" in
@@ -96,6 +96,9 @@ jobs:
                       ;;
                     nes-apu)
                       sudo apt-get install -y libasound2-dev
+                      ;;
+                    nes-emu)
+                      sudo apt-get install -y libasound2-dev libudev-dev libx11-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev
                       ;;
                   esac
 
