@@ -38,7 +38,11 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 34. **nes-mapper** (2026-03-08) - NES cartridge mapper implementations (NROM, MMC1, UxROM, CNROM, AxROM)
 35. **nes-apu** (2026-03-09) - NES 2A03 APU emulator with all 5 audio channels and full game demo
 36. **nes-emu** (2026-03-17) - NES emulator frontend using Bevy engine with video, audio, and input
-37. **llm-gguf-parser** (2026-05-20) - GGUF model parser for metadata and tensor info
+37. **qrcode** (2026-04-19) - QR code encoder/decoder with Version 1 support and CLI
+38. **llm-gguf-parser** (2026-05-20) - GGUF model parser for metadata and tensor info
+39. **llm-local-studio** (2026-05-24) - CLI client for Hugging Face model downloads and in-process llama.cpp text generation
+40. **llm-local-studio-2** (2026-05-24) - Local LLM backend with OpenAI-compatible API server using Axum (supporting streaming chat completions)
+41. **llm-local-studio-3** (2026-05-24) - Local LLM workspace bundling an embedded Vite Web UI inside a single compiled Rust binary
 
 ## Build Commands
 
@@ -64,15 +68,16 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **flashcard-app**: Android builds require NDK and cargo-apk (`cargo install cargo-apk`)
 - **media-metadata-explorer**: Uses `libavformat-ffi`; requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **tilesplit-wasm**: Build with `wasm-pack build --target web`
+- **llm-local-studio-3**: Requires `npm` on PATH to compile the embedded Vite Web UI during compilation
 
 ## Project Categories
 
 **System Programming**: small-os, shell
 **Emulation**: nes-cpu, nes-ppu, nes-joypad, nes-mapper, nes-apu, nes-emu
-**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp
-**Parsers/Encoders**: ebml, clog, llm-gguf-parser
-**Utilities**: calculator, count-words, rolldice, plum
-**GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard
+**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp, llm-local-studio-2, llm-local-studio-3
+**Parsers/Encoders**: ebml, clog, llm-gguf-parser, qrcode
+**Utilities**: calculator, count-words, rolldice, plum, llm-local-studio
+**GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard, llm-local-studio-3
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
 **Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life, tilesplit-wasm
 **Android**: flashcard-app, adb-client, mcp-adb
