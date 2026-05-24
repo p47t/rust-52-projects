@@ -2,25 +2,44 @@ import './style.css';
 
 const API_BASE = 'http://localhost:8080/v1';
 
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface ModelItem {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+}
+
+interface ModelsResponse {
+  object: string;
+  data: ModelItem[];
+}
+
 // DOM Elements
-const modelSelector = document.getElementById('model-selector');
-const currentModelName = document.getElementById('current-model-name');
-const chatHistory = document.getElementById('chat-history');
-const chatForm = document.getElementById('chat-form');
-const chatInput = document.getElementById('chat-input');
-const sendButton = document.getElementById('send-button');
+const modelSelector = document.getElementById('model-selector') as HTMLSelectElement | null;
+const currentModelName = document.getElementById('current-model-name') as HTMLElement | null;
+const chatHistory = document.getElementById('chat-history') as HTMLElement | null;
+const chatForm = document.getElementById('chat-form') as HTMLFormElement | null;
+const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+const sendButton = document.getElementById('send-button') as HTMLButtonElement | null;
 
 // State
-let selectedModel = '';
-let messages = [];
-let isGenerating = false;
+let selectedModel: string = '';
+const messages: ChatMessage[] = [];
+let isGenerating: boolean = false;
 
 // Initialize
 async function init() {
   await fetchModels();
   
+  if (!chatInput || !sendButton || !modelSelector || !chatForm) return;
+
   // Auto-resize textarea
-  chatInput.addEventListener('input', function() {
+  chatInput.addEventListener('input', function(this: HTMLTextAreaElement) {
     this.style.height = 'auto';
     this.style.height = (this.scrollHeight) + 'px';
     if (this.value.trim() !== '') {
@@ -30,7 +49,7 @@ async function init() {
     }
   });
 
-  chatInput.addEventListener('keydown', function(e) {
+  chatInput.addEventListener('keydown', function(this: HTMLTextAreaElement, e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isGenerating && this.value.trim() !== '') {
@@ -39,9 +58,12 @@ async function init() {
     }
   });
 
-  modelSelector.addEventListener('change', (e) => {
-    selectedModel = e.target.value;
-    currentModelName.textContent = selectedModel;
+  modelSelector.addEventListener('change', (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    selectedModel = target.value;
+    if (currentModelName) {
+      currentModelName.textContent = selectedModel;
+    }
   });
 
   chatForm.addEventListener('submit', handleFormSubmit);
@@ -49,11 +71,13 @@ async function init() {
 
 // Fetch available models
 async function fetchModels() {
+  if (!modelSelector) return;
+  
   try {
     const response = await fetch(`${API_BASE}/models`);
     if (!response.ok) throw new Error('Failed to fetch models');
     
-    const data = await response.json();
+    const data: ModelsResponse = await response.json();
     modelSelector.innerHTML = '';
     
     if (data.data.length === 0) {
@@ -73,7 +97,9 @@ async function fetchModels() {
       if (index === 0) {
         option.selected = true;
         selectedModel = model.id;
-        currentModelName.textContent = model.id;
+        if (currentModelName) {
+          currentModelName.textContent = model.id;
+        }
       }
       modelSelector.appendChild(option);
     });
@@ -84,11 +110,13 @@ async function fetchModels() {
 }
 
 // Handle form submission
-async function handleFormSubmit(e) {
+async function handleFormSubmit(e: Event) {
   e.preventDefault();
   
+  if (!chatInput || !sendButton || isGenerating) return;
+  
   const content = chatInput.value.trim();
-  if (!content || isGenerating) return;
+  if (!content) return;
 
   // Add user message
   messages.push({ role: 'user', content });
@@ -107,7 +135,7 @@ async function handleFormSubmit(e) {
 }
 
 // Append message to UI
-function appendMessage(role, content) {
+function appendMessage(role: 'user' | 'assistant' | 'system', content: string): HTMLElement {
   const msgEl = document.createElement('div');
   msgEl.className = `message ${role}`;
   
@@ -116,14 +144,19 @@ function appendMessage(role, content) {
   contentEl.textContent = content; // Using textContent prevents XSS
   
   msgEl.appendChild(contentEl);
-  chatHistory.appendChild(msgEl);
-  chatHistory.scrollTop = chatHistory.scrollHeight;
+  
+  if (chatHistory) {
+    chatHistory.appendChild(msgEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
   
   return contentEl;
 }
 
 // Generate response via SSE
 async function generateResponse() {
+  if (!chatInput || !modelSelector || !chatHistory) return;
+
   isGenerating = true;
   chatInput.setAttribute('disabled', 'true');
   modelSelector.setAttribute('disabled', 'true');
@@ -161,6 +194,10 @@ async function generateResponse() {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
 
@@ -178,7 +215,7 @@ async function generateResponse() {
           if (dataStr) {
             try {
               const data = JSON.parse(dataStr);
-              if (data.choices && data.choices[0].delta.content) {
+              if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
                 aiContent += data.choices[0].delta.content;
                 contentEl.textContent = aiContent;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
