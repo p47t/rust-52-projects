@@ -164,13 +164,7 @@ async fn handle_streaming(
     let final_events = stream::once(async move {
         // Wait for inference to complete to get the finish reason
         let finish_reason = match result_handle.await {
-            Ok(Ok(output)) => {
-                if output.generated_tokens >= max_tokens {
-                    "length"
-                } else {
-                    "stop"
-                }
-            }
+            Ok(Ok(output)) if output.generated_tokens >= max_tokens => "length",
             _ => "stop",
         };
 

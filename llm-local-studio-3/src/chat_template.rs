@@ -180,8 +180,6 @@ pub fn auto_detect(model_name: &str) -> Box<dyn ChatTemplate> {
 
     if lower.contains("llama-3") || lower.contains("llama3") {
         Box::new(Llama3Template)
-    } else if lower.contains("chatml") || lower.contains("im_start") {
-        Box::new(ChatMLTemplate)
     } else {
         Box::new(ChatMLTemplate)
     }

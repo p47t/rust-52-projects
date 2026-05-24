@@ -31,11 +31,13 @@ pub trait InferenceEngine {
     fn model_info(&self) -> Option<LoadedModelInfo>;
 }
 
+pub type StreamCallback = Box<dyn Fn(&str) + Send>;
+
 pub struct ChatRequest {
     pub messages: Vec<ChatMessage>,
     pub max_tokens: u32,
     pub seed: Option<u32>,
-    pub stream_callback: Option<Box<dyn Fn(&str) + Send>>,
+    pub stream_callback: Option<StreamCallback>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,12 +45,11 @@ pub struct LoadedModelInfo {
     pub model_id: String,
 }
 
-#[allow(clippy::type_complexity)]
 pub struct GenerateRequest {
     pub prompt: String,
     pub max_tokens: u32,
     pub seed: Option<u32>,
-    pub stream_callback: Option<Box<dyn Fn(&str) + Send>>,
+    pub stream_callback: Option<StreamCallback>,
 }
 
 pub struct GenerateOutput {

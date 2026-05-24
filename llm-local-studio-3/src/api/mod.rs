@@ -1,5 +1,6 @@
 //! OpenAI-compatible HTTP API server.
 
+pub mod assets;
 pub mod routes;
 pub mod types;
 
@@ -40,6 +41,7 @@ pub async fn start_server(config: ServerConfig, engine: EngineService) -> Result
     println!("    GET  /health");
     println!("    GET  /v1/models");
     println!("    POST /v1/chat/completions");
+    println!("    GET  / (Web UI)");
     println!();
 
     let cors = CorsLayer::new()
@@ -51,6 +53,7 @@ pub async fn start_server(config: ServerConfig, engine: EngineService) -> Result
         .route("/health", get(routes::health))
         .route("/v1/models", get(routes::list_models))
         .route("/v1/chat/completions", post(routes::chat_completions))
+        .fallback(get(assets::static_handler))
         .layer(cors)
         .with_state(engine);
 
