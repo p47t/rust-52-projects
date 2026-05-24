@@ -98,7 +98,7 @@ jobs:
                       sudo apt-get install -y libasound2-dev
                       ;;
                     nes-emu)
-                      sudo apt-get install -y libasound2-dev libudev-dev libx11-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev
+                      sudo apt-get install -y libasound2-dev libudev-dev libx11-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
                       ;;
                   esac
 
