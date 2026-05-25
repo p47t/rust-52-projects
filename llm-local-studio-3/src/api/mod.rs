@@ -6,8 +6,8 @@ pub mod types;
 
 use anyhow::{Context, Result};
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use tower_http::cors::{Any, CorsLayer};
 

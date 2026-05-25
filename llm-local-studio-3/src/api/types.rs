@@ -260,7 +260,10 @@ mod tests {
         let json = serde_json::to_value(&first_chunk).expect("failed to serialize");
         assert_eq!(json["object"], "chat.completion.chunk");
         let delta = &json["choices"][0]["delta"];
-        assert!(delta.get("role").is_some(), "first chunk should include role");
+        assert!(
+            delta.get("role").is_some(),
+            "first chunk should include role"
+        );
         assert_eq!(delta["content"], "Hi");
         assert!(json["choices"][0]["finish_reason"].is_null());
 

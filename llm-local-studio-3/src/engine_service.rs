@@ -51,7 +51,12 @@ impl EngineService {
     }
 
     /// Run a non-streaming chat completion.
-    pub async fn chat(&self, messages: Vec<ChatMessage>, max_tokens: u32, seed: Option<u32>) -> Result<GenerateOutput> {
+    pub async fn chat(
+        &self,
+        messages: Vec<ChatMessage>,
+        max_tokens: u32,
+        seed: Option<u32>,
+    ) -> Result<GenerateOutput> {
         let engine = self.inner.clone();
         tokio::task::spawn_blocking(move || {
             let mut engine = engine.lock().expect("engine mutex poisoned");
@@ -77,7 +82,10 @@ impl EngineService {
         messages: Vec<ChatMessage>,
         max_tokens: u32,
         seed: Option<u32>,
-    ) -> (mpsc::Receiver<String>, tokio::task::JoinHandle<Result<GenerateOutput>>) {
+    ) -> (
+        mpsc::Receiver<String>,
+        tokio::task::JoinHandle<Result<GenerateOutput>>,
+    ) {
         let (tx, rx) = mpsc::channel::<String>(64);
         let engine = self.inner.clone();
 

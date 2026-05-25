@@ -1,9 +1,12 @@
 //! HTTP route handlers for the OpenAI-compatible API.
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response, sse::{Event, Sse}};
-use axum::Json;
+use axum::response::{
+    IntoResponse, Response,
+    sse::{Event, Sse},
+};
 use futures::stream::{self, StreamExt};
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -153,7 +156,7 @@ async fn handle_streaming(
             }],
         };
         Ok::<Event, std::convert::Infallible>(
-            Event::default().data(serde_json::to_string(&chunk).unwrap_or_default())
+            Event::default().data(serde_json::to_string(&chunk).unwrap_or_default()),
         )
     });
 
@@ -189,10 +192,12 @@ async fn handle_streaming(
             Ok::<Event, std::convert::Infallible>(Event::default().data("[DONE]")),
         ];
         stream::iter(events)
-    }).flatten();
+    })
+    .flatten();
 
     // Combine: role event -> token events -> final events
-    let role_stream = stream::once(async move { Ok::<Event, std::convert::Infallible>(role_event) });
+    let role_stream =
+        stream::once(async move { Ok::<Event, std::convert::Infallible>(role_event) });
     let full_stream = role_stream.chain(token_events).chain(final_events);
 
     let sse = Sse::new(full_stream).keep_alive(axum::response::sse::KeepAlive::default());
@@ -200,10 +205,14 @@ async fn handle_streaming(
     (
         [
             (axum::http::header::CACHE_CONTROL, "no-cache"),
-            (axum::http::header::HeaderName::from_static("x-accel-buffering"), "no"),
+            (
+                axum::http::header::HeaderName::from_static("x-accel-buffering"),
+                "no",
+            ),
         ],
         sse,
-    ).into_response()
+    )
+        .into_response()
 }
 
 fn error_response(status: StatusCode, message: &str) -> Response {
