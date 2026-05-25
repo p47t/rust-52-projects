@@ -43,6 +43,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 39. **llm-local-studio** (2026-05-24) - CLI client for Hugging Face model downloads and in-process llama.cpp text generation
 40. **llm-local-studio-2** (2026-05-24) - Local LLM backend with OpenAI-compatible API server using Axum (supporting streaming chat completions)
 41. **llm-local-studio-3** (2026-05-24) - Local LLM workspace bundling an embedded Vite Web UI inside a single compiled Rust binary
+42. **llm-local-studio-4** (2026-05-24) - Local LLM workspace adding Audio Speech Recognition (ASR), Automatic Speech Translation (AST) via whisper-rs, and Gemma 4 Multimodal Audio proxy support
 
 ## Build Commands
 
@@ -69,15 +70,16 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **media-metadata-explorer**: Uses `libavformat-ffi`; requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **tilesplit-wasm**: Build with `wasm-pack build --target web`
 - **llm-local-studio-3**: Requires `npm` on PATH to compile the embedded Vite Web UI during compilation
+- **llm-local-studio-4**: Requires `npm` on PATH to compile the embedded Vite Web UI, and `ffmpeg` on PATH to decode and resample audio inputs for whisper.cpp and Gemma 4 audio completions
 
 ## Project Categories
 
 **System Programming**: small-os, shell
 **Emulation**: nes-cpu, nes-ppu, nes-joypad, nes-mapper, nes-apu, nes-emu
-**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp, llm-local-studio-2, llm-local-studio-3
+**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp, llm-local-studio-2, llm-local-studio-3, llm-local-studio-4
 **Parsers/Encoders**: ebml, clog, llm-gguf-parser, qrcode
 **Utilities**: calculator, count-words, rolldice, plum, llm-local-studio
-**GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard, llm-local-studio-3
+**GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard, llm-local-studio-3, llm-local-studio-4
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
 **Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life, tilesplit-wasm
 **Android**: flashcard-app, adb-client, mcp-adb

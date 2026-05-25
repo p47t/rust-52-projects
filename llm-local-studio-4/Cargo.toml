@@ -1,0 +1,31 @@
+[package]
+name = "llm-local-studio-4"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros", "multipart"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower = { version = "0.4", features = ["util"] }
+anyhow = "1.0"
+chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+encoding_rs = "0.8"
+futures = "0.3"
+reqwest = { version = "0.12", features = ["blocking", "json", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+urlencoding = "2.1"
+uuid = { version = "1", features = ["v4"] }
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2.0"
+base64 = "0.22"
+llama-cpp-2 = { version = "0.1.146", features = ["sampler"] }
+candle = { package = "candle-core", version = "0.10.2" }
+candle-nn = "0.10.2"
+candle-transformers = "0.10.2"
+tokenizers = "0.21.4"
+hf-hub = "0.4.3"
+rand = "0.8"

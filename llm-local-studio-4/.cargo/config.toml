@@ -1,0 +1,7 @@
+[env]
+LLAMA_STATIC_CRT = { value = "1", force = true }
+CMAKE_MSVC_RUNTIME_LIBRARY = { value = "MultiThreaded$<$<CONFIG:Debug>:Debug>", force = true }
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
