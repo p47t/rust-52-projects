@@ -22,10 +22,5 @@ uuid = { version = "1", features = ["v4"] }
 rust-embed = { version = "8", features = ["mime-guess"] }
 mime_guess = "2.0"
 base64 = "0.22"
-llama-cpp-2 = { version = "0.1.146", features = ["sampler"] }
-candle = { package = "candle-core", version = "0.10.2" }
-candle-nn = "0.10.2"
-candle-transformers = "0.10.2"
-tokenizers = "0.21.4"
-hf-hub = "0.4.3"
+llama-cpp-4 = { version = "0.3.0", features = ["mtmd", "vulkan"] }
 rand = "0.8"

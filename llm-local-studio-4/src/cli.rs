@@ -81,7 +81,7 @@ enum Command {
         #[arg(short, long, default_value = "models")]
         dir: PathBuf,
         /// Context size for the model.
-        #[arg(long, default_value_t = 2048)]
+        #[arg(long, default_value_t = 4096)]
         ctx_size: u32,
         /// Host address to bind the server to.
         #[arg(long, default_value = "127.0.0.1")]
@@ -89,9 +89,11 @@ enum Command {
         /// Port to bind the server to.
         #[arg(long, default_value_t = 8080)]
         port: u16,
-        /// Path to Whisper model directory or HF Repo ID for ASR and AST support.
+        /// Path to the multimodal projector (mmproj) GGUF file for direct audio/vision input.
+        /// Required for the "Direct Multimodal" pipeline in the UI.
+        /// Example: models/gemma-4-e4b-it-mmproj-f16.gguf
         #[arg(long)]
-        whisper_model: Option<String>,
+        mmproj: Option<PathBuf>,
     },
 }
 
@@ -157,8 +159,8 @@ impl Command {
                 ctx_size,
                 host,
                 port,
-                whisper_model,
-            } => serve_model(model, dir, ctx_size, host, port, whisper_model).await,
+                mmproj,
+            } => serve_model(model, dir, ctx_size, host, port, mmproj).await,
         }
     }
 }
@@ -245,7 +247,7 @@ async fn serve_model(
     ctx_size: u32,
     host: String,
     port: u16,
-    whisper_model: Option<String>,
+    mmproj: Option<PathBuf>,
 ) -> Result<()> {
     let engine = EngineService::new();
 
@@ -271,17 +273,21 @@ async fn serve_model(
         }
     };
 
-    if let Some(ref path) = whisper_model {
-        println!("Using Whisper model: {}", path);
+    if let Some(ref path) = mmproj {
+        println!("Using multimodal projector (mmproj): {}", path.display());
     }
     println!();
 
     engine.load_model(model_record).await?;
 
+    // Load the mmproj *after* the main model so MtmdContext can reference it.
+    if let Some(path) = mmproj {
+        engine.load_mmproj(path).await?;
+    }
+
     let config = ServerConfig {
         host,
         port,
-        whisper_model,
     };
     start_server(config, engine).await
 }

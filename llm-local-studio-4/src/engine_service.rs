@@ -5,6 +5,7 @@
 //! blocked. A standard [`std::sync::Mutex`] guards the engine because the lock
 //! is only held inside blocking tasks — never across `.await` points.
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
@@ -13,7 +14,7 @@ use tokio::sync::mpsc;
 use crate::chat_template::ChatMessage;
 use crate::inference::{
     ChatRequest, GenerateOutput, InferenceEngine, LlamaCppEngine, LoadModelRequest,
-    LoadedModelInfo, ModelHandle,
+    LoadedModelInfo, ModelHandle, MultimodalRequest,
 };
 
 /// Thread-safe, async-friendly inference service.
@@ -32,8 +33,7 @@ impl EngineService {
         }
     }
 
-    /// Load a model. Blocks the calling async task briefly (runs on a blocking
-    /// thread).
+    /// Load a model. Blocks the calling async task briefly (runs on a blocking thread).
     pub async fn load_model(&self, request: LoadModelRequest) -> Result<ModelHandle> {
         let engine = self.inner.clone();
         tokio::task::spawn_blocking(move || {
@@ -42,6 +42,17 @@ impl EngineService {
         })
         .await
         .context("load_model task panicked")?
+    }
+
+    /// Load the multimodal projector GGUF.  Must be called after `load_model`.
+    pub async fn load_mmproj(&self, mmproj_path: PathBuf) -> Result<()> {
+        let engine = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut engine = engine.lock().expect("engine mutex poisoned");
+            engine.load_mmproj(mmproj_path)
+        })
+        .await
+        .context("load_mmproj task panicked")?
     }
 
     /// Return metadata about the currently loaded model, if any.
@@ -73,10 +84,6 @@ impl EngineService {
 
     /// Run a streaming chat completion. Returns a receiver that yields token
     /// strings as they are generated.
-    ///
-    /// The final message on the channel will be `None`, indicating that
-    /// generation has finished. After that, the returned `GenerateOutput`
-    /// future resolves.
     pub fn chat_streaming(
         &self,
         messages: Vec<ChatMessage>,
@@ -97,13 +104,50 @@ impl EngineService {
                 max_tokens,
                 seed,
                 stream_callback: Some(Box::new(move |piece: &str| {
-                    // If the receiver is dropped (client disconnected), we
-                    // silently ignore the send error. Inference will still run
-                    // to completion, but tokens are discarded.
                     let _ = tx_clone.blocking_send(piece.to_owned());
                 })),
             });
-            drop(tx); // close the channel so the receiver sees completion
+            drop(tx);
+            result
+        });
+
+        (rx, handle)
+    }
+
+    /// Run a direct multimodal (audio) completion (non-streaming).
+    pub async fn run_multimodal(&self, request: MultimodalRequest) -> Result<GenerateOutput> {
+        let engine = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut engine = engine.lock().expect("engine mutex poisoned");
+            engine.run_multimodal(request)
+        })
+        .await
+        .context("run_multimodal task panicked")?
+    }
+
+    /// Run a direct multimodal (audio) completion with streaming.
+    pub fn multimodal_streaming(
+        &self,
+        request: MultimodalRequest,
+    ) -> (
+        mpsc::Receiver<String>,
+        tokio::task::JoinHandle<Result<GenerateOutput>>,
+    ) {
+        let (tx, rx) = mpsc::channel::<String>(64);
+        let engine = self.inner.clone();
+
+        let handle = tokio::task::spawn_blocking(move || {
+            let mut engine = engine.lock().expect("engine mutex poisoned");
+            let tx_clone = tx.clone();
+            let mut request = request;
+            let audio_path_clone = request.audio_path.clone();
+            request.stream_callback = Some(Box::new(move |piece: &str| {
+                let _ = tx_clone.blocking_send(piece.to_owned());
+            }));
+            let result = engine.run_multimodal(request);
+            drop(tx);
+            // Clean up temporary WAV file
+            let _ = std::fs::remove_file(&audio_path_clone);
             result
         });
 

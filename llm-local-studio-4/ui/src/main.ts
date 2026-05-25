@@ -29,10 +29,6 @@ const sendButton = document.getElementById('send-button') as HTMLButtonElement |
 
 // Audio Elements
 const micButton = document.getElementById('mic-button') as HTMLButtonElement | null;
-const audioMode = document.getElementById('audio-mode') as HTMLSelectElement | null;
-const whisperSettings = document.getElementById('whisper-settings') as HTMLElement | null;
-const audioTask = document.getElementById('audio-task') as HTMLSelectElement | null;
-const audioLanguage = document.getElementById('audio-language') as HTMLSelectElement | null;
 
 // State
 let selectedModel: string = '';
@@ -82,16 +78,6 @@ async function init() {
 
   if (micButton) {
     micButton.addEventListener('click', toggleRecording);
-  }
-
-  if (audioMode && whisperSettings) {
-    audioMode.addEventListener('change', () => {
-      if (audioMode.value === 'multimodal') {
-        whisperSettings.style.display = 'none';
-      } else {
-        whisperSettings.style.display = 'block';
-      }
-    });
   }
 }
 
@@ -296,13 +282,7 @@ async function startRecording() {
     mediaRecorder.onstop = async () => {
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       stream.getTracks().forEach(track => track.stop());
-      
-      const mode = audioMode?.value || 'asr';
-      if (mode === 'multimodal') {
-        await handleAudioMultimodal(audioBlob);
-      } else {
-        await handleAudioUpload(audioBlob);
-      }
+      await handleAudioMultimodal(audioBlob);
     };
 
     mediaRecorder.start();
@@ -326,58 +306,6 @@ function stopRecording() {
       micButton.classList.remove('recording');
       micButton.title = "Record Voice";
     }
-  }
-}
-
-// Upload recorded audio file
-async function handleAudioUpload(audioBlob: Blob) {
-  if (!chatInput || !sendButton) return;
-
-  const task = audioTask?.value || 'transcribe';
-  const language = audioLanguage?.value || 'auto';
-  
-  const endpoint = task === 'translate' ? 'translations' : 'transcriptions';
-  const url = `${API_BASE}/audio/${endpoint}`;
-
-  const formData = new FormData();
-  formData.append('file', audioBlob, 'recording.webm');
-  formData.append('model', 'whisper-1');
-  if (language !== 'auto' && task !== 'translate') {
-    formData.append('language', language);
-  }
-
-  // Update UI placeholder to show transcription state
-  const originalPlaceholder = chatInput.placeholder;
-  chatInput.placeholder = "Transcribing voice...";
-  chatInput.disabled = true;
-  if (micButton) micButton.disabled = true;
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Failed to transcribe: ${errText}`);
-    }
-
-    const data = await response.json();
-    if (data.text) {
-      chatInput.value = data.text;
-      chatInput.style.height = 'auto';
-      chatInput.style.height = (chatInput.scrollHeight) + 'px';
-      sendButton.removeAttribute('disabled');
-    }
-  } catch (error) {
-    console.error('Transcription error:', error);
-    alert(`Speech recognition failed: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    chatInput.placeholder = originalPlaceholder;
-    chatInput.disabled = false;
-    if (micButton) micButton.disabled = false;
-    chatInput.focus();
   }
 }
 
@@ -413,7 +341,7 @@ async function handleAudioMultimodal(audioBlob: Blob) {
       type: 'input_audio',
       input_audio: {
         data: base64Data,
-        format: 'wav'
+        format: 'webm'  // Browser MediaRecorder produces WebM/Opus; server converts to WAV
       }
     });
 

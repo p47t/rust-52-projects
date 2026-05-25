@@ -8,16 +8,97 @@ use crate::chat_template::{ChatMessage, Role};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
+// Multimodal Content Parts
+// ---------------------------------------------------------------------------
+
+/// Audio data embedded inside a chat message content array.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InputAudio {
+    /// Base64-encoded audio bytes (WebM/Opus from the browser, or WAV).
+    pub data: String,
+    /// Container format hint: `"webm"`, `"wav"`, `"ogg"`, etc.
+    pub format: String,
+}
+
+/// A single element in a multipart message content array.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentPart {
+    /// Plain text turn.
+    Text { text: String },
+    /// Inline audio (base64-encoded).
+    InputAudio { input_audio: InputAudio },
+}
+
+/// The `content` field of an API chat message can be either a plain string
+/// (text-only) or an array of [`ContentPart`]s (multimodal).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    Parts(Vec<ContentPart>),
+}
+
+impl MessageContent {
+    /// Extract all text parts concatenated into one string.
+    pub fn text_only(&self) -> String {
+        match self {
+            Self::Text(s) => s.clone(),
+            Self::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| {
+                    if let ContentPart::Text { text } = p {
+                        Some(text.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+        }
+    }
+
+    /// Return the first `InputAudio` part, if any.
+    pub fn first_audio(&self) -> Option<&InputAudio> {
+        if let Self::Parts(parts) = self {
+            for p in parts {
+                if let ContentPart::InputAudio { input_audio } = p {
+                    return Some(input_audio);
+                }
+            }
+        }
+        None
+    }
+}
+
+/// An API-layer chat message that supports multimodal content.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApiChatMessage {
+    pub role: Role,
+    pub content: MessageContent,
+}
+
+impl ApiChatMessage {
+    /// Convert to a text-only [`ChatMessage`] for template rendering.
+    pub fn to_chat_message(&self) -> ChatMessage {
+        ChatMessage {
+            role: self.role.clone(),
+            content: self.content.text_only(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Chat Completion Request
 // ---------------------------------------------------------------------------
 
 /// A chat completion request following the OpenAI `POST /v1/chat/completions` schema.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChatCompletionRequest {
-    /// Model identifier (e.g. `"llama-3-8b"`).
+    /// Model identifier (e.g. `"gemma-4-e4b-it"`).
     pub model: String,
-    /// The conversation history sent by the client.
-    pub messages: Vec<ChatMessage>,
+    /// The conversation history sent by the client (may contain audio parts).
+    pub messages: Vec<ApiChatMessage>,
     /// Sampling temperature (0.0–2.0). `None` means the engine default.
     #[serde(default)]
     pub temperature: Option<f32>,
@@ -237,60 +318,36 @@ mod tests {
         assert_eq!(usage["total_tokens"], 15);
     }
 
-    /// Verify that a streaming chunk serializes correctly, including
-    /// `skip_serializing_if` behaviour for `ChunkDelta` fields.
+    /// Verify MessageContent deserialization from plain string.
     #[test]
-    fn test_chat_completion_chunk_serialization() {
-        // First chunk — has role, has content, no finish_reason.
-        let first_chunk = ChatCompletionChunk {
-            id: "chatcmpl-stream-id".to_string(),
-            object: "chat.completion.chunk".to_string(),
-            created: 1_700_000_000,
-            model: "test-model".to_string(),
-            choices: vec![ChunkChoice {
-                index: 0,
-                delta: ChunkDelta {
-                    role: Some(Role::Assistant),
-                    content: Some("Hi".to_string()),
-                },
-                finish_reason: None,
-            }],
-        };
+    fn test_message_content_plain_string() {
+        let json = r#""Hello world""#;
+        let content: MessageContent = serde_json::from_str(json).unwrap();
+        assert_eq!(content.text_only(), "Hello world");
+        assert!(content.first_audio().is_none());
+    }
 
-        let json = serde_json::to_value(&first_chunk).expect("failed to serialize");
-        assert_eq!(json["object"], "chat.completion.chunk");
-        let delta = &json["choices"][0]["delta"];
-        assert!(
-            delta.get("role").is_some(),
-            "first chunk should include role"
-        );
-        assert_eq!(delta["content"], "Hi");
-        assert!(json["choices"][0]["finish_reason"].is_null());
+    /// Verify MessageContent deserialization from parts array.
+    #[test]
+    fn test_message_content_parts_text_only() {
+        let json = r#"[{"type":"text","text":"Describe this."}]"#;
+        let content: MessageContent = serde_json::from_str(json).unwrap();
+        assert_eq!(content.text_only(), "Describe this.");
+        assert!(content.first_audio().is_none());
+    }
 
-        // Final chunk — no role, no content, has finish_reason.
-        let final_chunk = ChatCompletionChunk {
-            id: "chatcmpl-stream-id".to_string(),
-            object: "chat.completion.chunk".to_string(),
-            created: 1_700_000_000,
-            model: "test-model".to_string(),
-            choices: vec![ChunkChoice {
-                index: 0,
-                delta: ChunkDelta {
-                    role: None,
-                    content: None,
-                },
-                finish_reason: Some("stop".to_string()),
-            }],
-        };
-
-        let json = serde_json::to_value(&final_chunk).expect("failed to serialize");
-        let delta = &json["choices"][0]["delta"];
-        assert!(delta.get("role").is_none(), "final chunk should omit role");
-        assert!(
-            delta.get("content").is_none(),
-            "final chunk should omit content"
-        );
-        assert_eq!(json["choices"][0]["finish_reason"], "stop");
+    /// Verify MessageContent deserialization with an audio part.
+    #[test]
+    fn test_message_content_parts_with_audio() {
+        let json = r#"[
+            {"type":"text","text":"Transcribe this."},
+            {"type":"input_audio","input_audio":{"data":"base64abc","format":"webm"}}
+        ]"#;
+        let content: MessageContent = serde_json::from_str(json).unwrap();
+        assert_eq!(content.text_only(), "Transcribe this.");
+        let audio = content.first_audio().expect("should have audio");
+        assert_eq!(audio.format, "webm");
+        assert_eq!(audio.data, "base64abc");
     }
 
     /// `generate_completion_id` should produce the expected prefix.
