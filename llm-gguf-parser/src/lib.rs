@@ -235,6 +235,9 @@ pub struct GgufFile {
     pub version: u32,
     pub metadata: HashMap<String, Value>,
     pub tensors: Vec<TensorInfo>,
+    /// Byte offset where the tensor data section begins (after header padding).
+    /// Tensor `data` is located at `data_offset + tensor.offset`.
+    pub data_offset: u64,
 }
 
 struct Reader<'a> {
@@ -405,9 +408,20 @@ pub fn parse_gguf(data: impl AsRef<[u8]>) -> Result<GgufFile, ParserError> {
         });
     }
 
+    // 6. Compute data section offset: pad header end up to `general.alignment` (default 32).
+    let alignment = match metadata.get("general.alignment") {
+        Some(Value::Uint32(a)) => *a as u64,
+        Some(Value::Uint64(a)) => *a,
+        _ => 32,
+    }
+    .max(1);
+    let header_end = reader.offset as u64;
+    let data_offset = header_end.next_multiple_of(alignment);
+
     Ok(GgufFile {
         version,
         metadata,
         tensors,
+        data_offset,
     })
 }
