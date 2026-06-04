@@ -1,0 +1,12 @@
+[package]
+name = "self-extracting"
+version = "0.1.0"
+authors = ["Patrick Tsai <patrick@simplypatrick.com>"]
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+flate2 = "1"
+tar = "0.4"
+sha2 = "0.10"
+walkdir = "2"

@@ -9,3 +9,5 @@ nes-ppu/games/
 *.sav
 screenshot_*.png
 /.antigravitycli
+self-extracting/test
+
