@@ -1,2 +1,9 @@
+/target
+tests/*.jpg
+tests/*.png
+tests/*.tgz
+tests/*.tar.gz
+tests/lfw_funneled/
+tests/iccv09Data/
+*.onnx
 /opencv-rust-patch/docs/*.rs
-

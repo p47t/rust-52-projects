@@ -7,7 +7,7 @@ use std::{fmt, mem, ptr, slice};
 pub use mat_::*;
 
 use crate::boxed_ref::{BoxedRef, BoxedRefMut};
-use crate::core::{MatConstIterator, MatExpr, MatSize, MatStep, Point, Rect, Scalar, Size, UMat};
+use crate::core::{MatConstIterator, MatExpr, MatStep, Point, Rect, Scalar, Size, UMat};
 use crate::manual::core::DataType;
 use crate::prelude::*;
 use crate::{core, input_output_array, input_output_array_vector, Error, Result};
@@ -36,7 +36,10 @@ trait MatMatcher {
 impl<T: MatTraitConst + ?Sized> MatMatcher for T {
 	fn match_indices(&self, idx: &[i32]) -> Result<()> {
 		let mat_size = self.mat_size();
+		#[cfg(not(ocvrs_opencv_branch_5))]
 		let size = &*mat_size;
+		#[cfg(ocvrs_opencv_branch_5)]
+		let size: &[i32] = &mat_size.p()[..usize::try_from(mat_size.dims()).unwrap_or(0)];
 		if size.len() != idx.len() {
 			return Err(Error::new(
 				core::StsUnmatchedSizes,
@@ -148,7 +151,10 @@ fn match_length(sizes: &[i32], slice_len: usize, size_mul: usize) -> Result<()> 
 #[inline(always)]
 unsafe fn data_at_idx<T: DataType>(mat: &(impl MatTraitConst + ?Sized), i0: usize) -> *const T {
 	let size = mat.mat_size();
+	#[cfg(not(ocvrs_opencv_branch_5))]
 	let size = &*size;
+	#[cfg(ocvrs_opencv_branch_5)]
+	let size: &[i32] = &size.p()[..usize::try_from(size.dims()).unwrap_or(0)];
 	let data = mat.data();
 	if size.len() <= 1 || mat.is_continuous() || size[0] == 1 {
 		unsafe { data.cast::<T>().add(i0) }
@@ -601,7 +607,15 @@ pub trait MatTraitConstManual: MatTraitConst {
 
 	fn to_vec_2d<T: DataType>(&self) -> Result<Vec<Vec<T>>> {
 		match_format::<T>(self.typ()).and_then(|_| {
-			let size = match *self.mat_size() {
+			#[cfg(not(ocvrs_opencv_branch_5))]
+			let mat_size = self.mat_size();
+			#[cfg(not(ocvrs_opencv_branch_5))]
+			let size_slice: &[i32] = &*mat_size;
+			#[cfg(ocvrs_opencv_branch_5)]
+			let mat_size = self.mat_size();
+			#[cfg(ocvrs_opencv_branch_5)]
+			let size_slice: &[i32] = &mat_size.p()[..usize::try_from(mat_size.dims()).unwrap_or(0)];
+			let size = match *size_slice {
 				[rows, cols] => Size::new(cols, rows),
 				ref mat_size => {
 					return Err(Error::new(
@@ -844,6 +858,7 @@ impl fmt::Debug for MatDataDumper<'_> {
 input_output_array! { UMat, from_umat, from_umat_mut }
 input_output_array_vector! { UMat, from_umat_vec, from_umat_vec_mut }
 
+#[cfg(not(ocvrs_opencv_branch_5))]
 impl Deref for MatSize<'_> {
 	type Target = [i32];
 
@@ -859,6 +874,7 @@ impl Deref for MatSize<'_> {
 	}
 }
 
+#[cfg(not(ocvrs_opencv_branch_5))]
 impl fmt::Debug for MatSize<'_> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		writeln!(f, "{:#?}", self.deref())
@@ -869,16 +885,22 @@ impl Deref for MatStep {
 	#[cfg(not(ocvrs_opencv_branch_5))]
 	type Target = [usize; 2];
 	#[cfg(ocvrs_opencv_branch_5)]
-	type Target = [usize; 3];
+	type Target = [usize; 10];
 
 	fn deref(&self) -> &Self::Target {
-		self.buf()
+		#[cfg(not(ocvrs_opencv_branch_5))]
+		{ self.buf() }
+		#[cfg(ocvrs_opencv_branch_5)]
+		{ self.p() }
 	}
 }
 
 impl DerefMut for MatStep {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.buf_mut()
+		#[cfg(not(ocvrs_opencv_branch_5))]
+		{ self.buf_mut() }
+		#[cfg(ocvrs_opencv_branch_5)]
+		{ self.p_mut() }
 	}
 }
 

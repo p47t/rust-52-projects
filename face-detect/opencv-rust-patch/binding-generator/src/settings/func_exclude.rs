@@ -57,6 +57,14 @@ fn core_factory() -> FuncExclude {
 		"cv__OutputArray__OutputArray_const_vectorLGpuMatGR",
 		"cv_cuda_convertFp16_const__InputArrayR_const__OutputArrayR_StreamR",
 		"cv_getImpl_vectorLintGR_vectorLStringGR",
+		// missing in OpenCV 5.1.0 core.lib
+		"cv__OutputArray_fit_const_Size_int_int_bool_DepthMask",
+		"cv__OutputArray_fit_const_int_int_int_int_bool_DepthMask",
+		"cv__OutputArray_fit_const_const_MatShapeR_int_int_bool_DepthMask",
+		"cv__OutputArray_fitSameSize_const_const__InputArrayR_int",
+		// moved to geometry module in OpenCV 5
+		"cv_Moments_Moments",
+		"cv_Moments_Moments_double_double_double_double_double_double_double_double_double_double",
 	])
 }
 

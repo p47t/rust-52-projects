@@ -47,6 +47,7 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 43. **llm-local-studio-4** (2026-05-24) - Local LLM workspace adding Audio Speech Recognition (ASR), Automatic Speech Translation (AST) via whisper-rs, and Gemma 4 Multimodal Audio proxy support
 44. **tiny-llm-runner** (2026-05-30) - Pure-Rust Llama inference engine running GGUF models end-to-end with no C dependencies
 45. **self-extracting** (2026-06-04) - Generic tool that turns any folder into a self-extracting executable (no rebuild required)
+46. **face-detect** (2026-06-11) - Face detection with bounding boxes and landmarks using OpenCV YuNet
 
 ## Build Commands
 
@@ -74,6 +75,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **tilesplit-wasm**: Build with `wasm-pack build --target web`
 - **llm-local-studio-3**: Requires `npm` on PATH to compile the embedded Vite Web UI during compilation
 - **llm-local-studio-4**: Requires `npm` on PATH to compile the embedded Vite Web UI, and `ffmpeg` on PATH to decode and resample audio inputs for whisper.cpp and Gemma 4 audio completions
+- **face-detect**: Requires OpenCV 4.7+ (or 5.x) with development headers and `libclang`
 
 ## Project Categories
 
@@ -89,6 +91,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 **Android**: flashcard-app, adb-client, mcp-adb
 **FFI**: libavformat-ffi
 **Multimedia**: media-metadata-explorer, libavformat-ffi, guitar-fretboard
+**Computer Vision**: face-detect
 
 ## Architecture
 

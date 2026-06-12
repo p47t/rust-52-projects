@@ -1,0 +1,10 @@
+[package]
+name = "face-detect"
+version = "0.1.0"
+edition = "2021"
+description = "Face detection using OpenCV 5 YuNet model with bounding boxes and landmark drawing"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+opencv = { path = "opencv-rust-patch", features = ["clang-runtime"] }
