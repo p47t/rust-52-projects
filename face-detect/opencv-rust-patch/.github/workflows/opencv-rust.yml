@@ -1,0 +1,183 @@
+name: opencv-rust
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+permissions:
+  contents: read
+jobs:
+  src:
+    strategy:
+      fail-fast: false
+      matrix:
+        os-image:
+          - ubuntu-24.04
+          - macos-15
+        opencv-version:
+          - 4.11.0
+        linkage:
+          - dynamic
+        include:
+          - os-image: ubuntu-24.04
+            opencv-version: 4.11.0
+            linkage: static
+          - os-image: ubuntu-24.04
+            opencv-version: 5.0.0-alpha
+            linkage: dynamic
+          - os-image: ubuntu-22.04
+            opencv-version: 3.4.20
+            linkage: dynamic
+          - os-image: macos-14
+            opencv-version: 3.4.20
+            linkage: dynamic
+    runs-on: ${{ matrix.os-image }}
+    env:
+      Atlas_ROOT_DIR: /usr/include/ # for cmake to find lapacke.h
+      OPENCV_VERSION: ${{ matrix.opencv-version }}
+      OPENCV_LINKAGE: ${{ matrix.linkage }}
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/build
+          key: build-${{ matrix.opencv-version }}-${{ matrix.linkage }}-${{ matrix.os-image }}
+
+      - name: Install dependencies
+        run: ci/install.sh
+        shell: bash
+
+      - name: Test project
+        run: ci/script.sh
+        shell: bash
+
+  vcpkg:
+    strategy:
+      fail-fast: false
+      matrix:
+        os-image:
+          - ubuntu-24.04
+          - windows-2025
+        vcpkg-version:
+          - 2026.03.18 # https://github.com/microsoft/vcpkg/releases
+        vcpkg-features-cache-key:
+          - full
+        vcpkg-features:
+          - contrib,nonfree,ade,opencl
+        include:
+          - os-image: windows-2025
+            vcpkg-version: 2026.03.18
+            vcpkg-features-cache-key: min
+            vcpkg-features: contrib
+          - os-image: macos-15
+            vcpkg-version: 2026.03.18
+            vcpkg-features-cache-key: full-no-opencl
+            vcpkg-features: contrib,nonfree,ade
+    runs-on: ${{ matrix.os-image }}
+    env:
+      VCPKG_VERSION: ${{ matrix.vcpkg-version }}
+      VCPKG_FEATURES: ${{ matrix.vcpkg-features }}
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/cache@v5
+        with:
+          path: ~/build
+          key: vcpkg-${{ matrix.vcpkg-version }}-${{ matrix.os-image }}-${{ matrix.vcpkg-features-cache-key }}
+
+      - name: Install dependencies
+        run: ci/install.sh
+        shell: bash
+
+      - name: Test project
+        run: ci/script.sh
+        shell: bash
+
+  bin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os-image:
+          - windows-2025
+        version:
+          - opencv: 3.4.16
+          - opencv: 4.11.0 # https://community.chocolatey.org/packages/OpenCV#versionhistory
+        include:
+          - os-image: ubuntu-24.04
+            version:
+              opencv: 4.6.0
+          - os-image: ubuntu-22.04
+            version:
+              opencv: 4.5.4
+          - os-image: macos-15
+            version:
+              brew: "@4"
+    runs-on: ${{ matrix.os-image }}
+    env:
+      OPENCV_VERSION: ${{ matrix.version.opencv }}
+      BREW_OPENCV_VERSION: ${{ matrix.version.brew }}
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install dependencies
+        run: ci/install.sh
+        shell: bash
+
+      - name: Test project
+        run: ci/script.sh
+        shell: bash
+
+  docs-rs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run a documentation generation test
+        run: ci/docs-rs.sh
+        shell: bash
+
+  msrv:
+    runs-on: ubuntu-24.04
+    env:
+      OPENCV_VERSION: 4.11.0
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/build
+          key: build-${{ env.OPENCV_VERSION }}-dynamic-ubuntu-24.04
+
+      - name: Get MSRV package metadata
+        id: metadata
+        run: cargo metadata --no-deps --format-version 1 | jq -r '"msrv="+(.packages[]|select(.name=="opencv").rust_version)' >> $GITHUB_OUTPUT
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.metadata.outputs.msrv }}
+
+      - name: Install dependencies
+        run: ci/install.sh
+        shell: bash
+
+      - name: Check project
+        run: ci/msrv.sh
+        shell: bash
