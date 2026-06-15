@@ -1,0 +1,11 @@
+[package]
+name = "depth-relief"
+version = "0.1.0"
+edition = "2021"
+description = "3D-printable depth reliefs from photos using OpenCV DNN (MiDaS) and Stereo matching"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+opencv = { path = "opencv-rust-patch", features = ["clang-runtime"] }
+half = "2"
