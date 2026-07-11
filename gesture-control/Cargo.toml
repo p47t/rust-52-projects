@@ -1,0 +1,11 @@
+[package]
+name = "gesture-control"
+version = "0.1.0"
+edition = "2021"
+description = "Native, zero-overhead hand gesture OS controller in Rust using OpenCV and Enigo"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+opencv = { path = "opencv-rust-patch", features = ["clang-runtime"] }
+enigo = "0.2.0"
