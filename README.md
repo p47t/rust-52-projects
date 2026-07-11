@@ -48,6 +48,12 @@ Build Rust programming skills by creating 52 projects ~~in one year~~.
 44. **tiny-llm-runner** (2026-05-30) - Pure-Rust Llama inference engine running GGUF models end-to-end with no C dependencies
 45. **self-extracting** (2026-06-04) - Generic tool that turns any folder into a self-extracting executable (no rebuild required)
 46. **face-detect** (2026-06-11) - Face detection with bounding boxes and landmarks using OpenCV YuNet
+47. **face-mosaic** (2026-06-15) - Real-time face detection + automatic blurring/pixelation for video files using OpenCV 5
+48. **depth-relief** (2026-06-15) - 3D-printable depth reliefs from photos using OpenCV DNN (MiDaS) and Stereo Matching
+49. **gesture-control** (2026-06-15) - Native, zero-overhead hand gesture OS controller in Rust using OpenCV and Enigo
+50. **ip-camera** (2026-06-16) - Asynchronous cross-platform IP camera & video processing server using OpenCV 5 and Axum
+51. **wakeword-engine** (2026-06-18) - Real-time wakeword detection engine using WebRTC APM (Sonora) and openWakeWord
+52. **voice-assistant** (2026-06-20) - Local voice assistant integrating wakeword detection, active recording with VAD, and local multimodal LLM audio inference via Gemma-4
 
 ## Build Commands
 
@@ -76,22 +82,27 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **llm-local-studio-3**: Requires `npm` on PATH to compile the embedded Vite Web UI during compilation
 - **llm-local-studio-4**: Requires `npm` on PATH to compile the embedded Vite Web UI, and `ffmpeg` on PATH to decode and resample audio inputs for whisper.cpp and Gemma 4 audio completions
 - **face-detect**: Requires OpenCV 4.7+ (or 5.x) with development headers and `libclang`
+- **face-mosaic**: Requires OpenCV 5.x with development headers and `libclang`
+- **depth-relief**: Requires OpenCV 5.x with development headers and `libclang`
+- **gesture-control**: Requires OpenCV 5.x with development headers, `libclang`, and display server (Win32/X11/Wayland) compatibility
+- **ip-camera**: Requires OpenCV 5.x with development headers and `libclang`
+- **voice-assistant**: Requires the Gemma-4 GGUF models and mmproj GGUF projector from llm-local-studio-4
 
 ## Project Categories
 
 **System Programming**: small-os, shell
 **Emulation**: nes-cpu, nes-ppu, nes-joypad, nes-mapper, nes-apu, nes-emu
-**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp, llm-local-studio-2, llm-local-studio-3, llm-local-studio-4
+**Web/Networking**: web-server, hyper-app, socks5, game-server, file-transfer, tftp, llm-local-studio-2, llm-local-studio-3, llm-local-studio-4, ip-camera
 **Parsers/Encoders**: ebml, clog, llm-gguf-parser, qrcode
-**LLM/AI**: llm-gguf-parser, llm-local-studio, llm-local-studio-2, llm-local-studio-3, llm-local-studio-4, tiny-llm-runner
+**LLM/AI**: llm-gguf-parser, llm-local-studio, llm-local-studio-2, llm-local-studio-3, llm-local-studio-4, tiny-llm-runner, wakeword-engine, voice-assistant
 **Utilities**: calculator, count-words, rolldice, plum, llm-local-studio, self-extracting, using-evcxr
 **GUI Applications**: iced-calculator, gpui-calculator, flashcard-app, guitar-fretboard, llm-local-studio-3, llm-local-studio-4
 **Advanced**: async-job-queue (async job queue), builder-derive (procedural macro)
 **Cloud/WASM**: programming-wisdom (Lambda), wasm-markdown-editor, wgpu-game-of-life, tilesplit-wasm
 **Android**: flashcard-app, adb-client, mcp-adb
 **FFI**: libavformat-ffi
-**Multimedia**: media-metadata-explorer, libavformat-ffi, guitar-fretboard
-**Computer Vision**: face-detect
+**Multimedia**: media-metadata-explorer, libavformat-ffi, guitar-fretboard, face-mosaic, depth-relief, gesture-control, ip-camera, wakeword-engine, voice-assistant
+**Computer Vision**: face-detect, face-mosaic, depth-relief, gesture-control, ip-camera
 
 ## Architecture
 
