@@ -1,0 +1,16 @@
+[package]
+name = "ip-camera"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform IP Camera and video processing server in Rust using OpenCV 5, Axum, and Tokio"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.7", features = ["macros"] }
+chrono = { version = "0.4", features = ["clock"] }
+futures-util = "0.3"
+mime = "0.3"
+opencv = { path = "opencv-rust-patch", features = ["clang-runtime"] }
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
