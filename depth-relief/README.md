@@ -54,9 +54,14 @@ To generate a depth relief from a left-right stereo image pair:
 build.bat run --release -- --mode stereo --left path/to/left.jpg --right path/to/right.jpg --output-stl relief.stl --width 100
 ```
 
-- Optional tuning arguments:
-  - `--stereo-disparities <num>`: Search range for block matching. Must be a positive integer divisible by 16 (default: 64).
-  - `--stereo-block-size <num>`: Matching window size. Must be an odd integer $\ge 5$ (default: 15).
+  - Optional facial feature enhancement & post-processing arguments:
+  - `--detail-weight <0.0..1.0>`: High-pass photo detail blending weight (default: 0.4). Engraves sharp eyes, nostrils, lips, and hair strands from photo shading onto the 3D relief.
+  - `--gamma <num>`: Contrast curve exponent (< 1.0 expands facial feature midtones, default: 0.7).
+  - `--clahe`: Enable Contrast Limited Adaptive Histogram Equalization for sharp local facial contours.
+  - `--relief-height <mm>`: Relief amplitude / max depth displacement in mm (e.g. 14.0 for deep facial reliefs).
+  - `--clip-min <0.0..0.49>`: Lower quantile clip bound to eliminate background compression (default: 0.02).
+  - `--clip-max <0.51..1.0>`: Upper quantile clip bound to eliminate peak compression (default: 0.98).
+  - `--smooth-radius <num>`: Edge-preserving bilateral filter radius (default: 3).
 
 ---
 
@@ -70,7 +75,7 @@ Options:
   -i, --input <INPUT>                    Path to input image (required for single image mode)
       --left <LEFT>                      Path to left image (required for stereo mode)
       --right <RIGHT>                    Path to right image (required for stereo mode)
-  -m, --model <MODEL>                    Path to the MiDaS ONNX model file [default: model-small.onnx]
+  -M, --model <MODEL>                    Path to the MiDaS ONNX model file [default: model-small.onnx]
   -o, --output-stl <OUTPUT_STL>          Output STL file path [default: relief.stl]
   -d, --output-depth <OUTPUT_DEPTH>      Output depth map image path [default: depth.png]
       --width <WIDTH>                    Physical width of the 3D relief in mm [default: 100.0]
@@ -79,6 +84,12 @@ Options:
   -b, --base-height <BASE_HEIGHT>        Flat base height in mm [default: 2.0]
       --stereo-disparities <DISPARITIES> Number of disparities for stereo matching [default: 64]
       --stereo-block-size <BLOCK_SIZE>   Block size for stereo matching [default: 15]
+      --gamma <GAMMA>                    Gamma contrast exponent (< 1.0 expands midtones) [default: 0.7]
+      --detail-weight <WEIGHT>           High-pass photo detail weight (0.0 to 1.0) [default: 0.4]
+      --clip-min <CLIP_MIN>              Lower quantile clipping bound [default: 0.02]
+      --clip-max <CLIP_MAX>              Upper quantile clipping bound [default: 0.98]
+      --clahe                            Apply CLAHE for enhanced facial contours
+      --smooth-radius <RADIUS>           Edge-preserving bilateral smoothing radius [default: 3]
   -h, --help                             Print help
 ```
 

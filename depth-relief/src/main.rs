@@ -30,7 +30,7 @@ struct Cli {
     right: Option<PathBuf>,
 
     /// Path to the MiDaS ONNX model file
-    #[arg(short, long, default_value = "model-small.onnx")]
+    #[arg(short = 'M', long, default_value = "model-small.onnx")]
     model: PathBuf,
 
     /// Output STL file path
@@ -64,6 +64,30 @@ struct Cli {
     /// Block size for stereo matching (must be an odd integer >= 5)
     #[arg(long, default_value_t = 15)]
     stereo_block_size: i32,
+
+    /// Gamma contrast exponent (< 1.0 expands facial feature midtones)
+    #[arg(long, default_value_t = 0.7)]
+    gamma: f32,
+
+    /// High-pass photo detail weight (0.0 to 1.0) to engrave sharp eyes, nose, lips, hair
+    #[arg(long, default_value_t = 0.4)]
+    detail_weight: f32,
+
+    /// Lower quantile clipping bound (0.0 to 0.49) to eliminate background compression
+    #[arg(long, default_value_t = 0.02)]
+    clip_min: f32,
+
+    /// Upper quantile clipping bound (0.51 to 1.0) to eliminate foreground peak compression
+    #[arg(long, default_value_t = 0.98)]
+    clip_max: f32,
+
+    /// Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) for enhanced facial contours
+    #[arg(long, default_value_t = false)]
+    clahe: bool,
+
+    /// Edge-preserving bilateral filter spatial radius (0 to disable smoothing)
+    #[arg(long, default_value_t = 3)]
+    smooth_radius: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -141,6 +165,15 @@ fn check_and_download_model(model_path: &Path) -> Result<()> {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    let post_process_opts = depth::DepthPostProcessOptions {
+        clip_min_quantile: cli.clip_min,
+        clip_max_quantile: cli.clip_max,
+        gamma: cli.gamma,
+        detail_weight: cli.detail_weight,
+        enable_clahe: cli.clahe,
+        smooth_radius: cli.smooth_radius,
+    };
+
     // 1. Get depth map based on selected mode
     let depth_map = match cli.mode {
         Mode::Single => {
@@ -161,7 +194,7 @@ fn main() -> Result<()> {
             )?;
 
             println!("Estimating depth using MiDaS ONNX model...");
-            depth::estimate_depth_single(&img, &cli.model.to_string_lossy())?
+            depth::estimate_depth_single(&img, &cli.model.to_string_lossy(), &post_process_opts)?
         }
         Mode::Stereo => {
             let left_path = cli.left.as_ref().ok_or_else(|| {
@@ -211,6 +244,7 @@ fn main() -> Result<()> {
                 &right_img,
                 cli.stereo_disparities,
                 cli.stereo_block_size,
+                &post_process_opts,
             )?
         }
     };

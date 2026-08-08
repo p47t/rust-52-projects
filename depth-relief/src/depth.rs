@@ -6,18 +6,237 @@ use opencv::{
     stereo,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub struct DepthPostProcessOptions {
+    /// Quantile lower bound for clipping background outliers (0.0 to 0.49)
+    pub clip_min_quantile: f32,
+    /// Quantile upper bound for clipping foreground peak outliers (0.51 to 1.0)
+    pub clip_max_quantile: f32,
+    /// Gamma contrast exponent (< 1.0 boosts facial feature midtones)
+    pub gamma: f32,
+    /// High-pass photo detail weight (0.0 to 1.0) to engrave sharp eyes, nose, lips, hair
+    pub detail_weight: f32,
+    /// Enable CLAHE for adaptive local feature sharpening
+    pub enable_clahe: bool,
+    /// Spatial radius for bilateral edge-preserving smoothing (0 to disable)
+    pub smooth_radius: i32,
+}
+
+impl Default for DepthPostProcessOptions {
+    fn default() -> Self {
+        Self {
+            clip_min_quantile: 0.01,
+            clip_max_quantile: 0.99,
+            gamma: 0.7,
+            detail_weight: 0.4,
+            enable_clahe: false,
+            smooth_radius: 3,
+        }
+    }
+}
+
+pub fn extract_high_pass_detail(img: &Mat, target_size: Size) -> Result<Mat> {
+    let mut gray = Mat::default();
+    if img.channels() > 1 {
+        imgproc::cvt_color(
+            img,
+            &mut gray,
+            imgproc::COLOR_BGR2GRAY,
+            0,
+            AlgorithmHint::ALGO_HINT_DEFAULT,
+        )?;
+    } else {
+        gray = img.clone();
+    }
+
+    let mut resized_gray = Mat::default();
+    imgproc::resize(
+        &gray,
+        &mut resized_gray,
+        target_size,
+        0.0,
+        0.0,
+        imgproc::INTER_CUBIC,
+    )?;
+
+    let mut f32_gray = Mat::default();
+    resized_gray.convert_to(&mut f32_gray, CV_32F, 1.0 / 255.0, 0.0)?;
+
+    let mut blurred = Mat::default();
+    let ksize = Size::new(15, 15);
+    imgproc::gaussian_blur(
+        &f32_gray,
+        &mut blurred,
+        ksize,
+        3.0,
+        3.0,
+        opencv::core::BORDER_DEFAULT,
+        AlgorithmHint::ALGO_HINT_DEFAULT,
+    )?;
+
+    let mut detail_map = Mat::new_rows_cols_with_default(
+        target_size.height,
+        target_size.width,
+        CV_32F,
+        Scalar::default(),
+    )?;
+
+    for y in 0..target_size.height {
+        for x in 0..target_size.width {
+            let orig_val = *f32_gray.at_2d::<f32>(y, x)?;
+            let blur_val = *blurred.at_2d::<f32>(y, x)?;
+            let hp = orig_val - blur_val;
+            *detail_map.at_2d_mut::<f32>(y, x)? = hp;
+        }
+    }
+
+    Ok(detail_map)
+}
+
+pub fn post_process_depth_map(
+    raw_map: &Mat,
+    opt_source_img: Option<&Mat>,
+    options: &DepthPostProcessOptions,
+) -> Result<Mat> {
+    let h = raw_map.rows();
+    let w = raw_map.cols();
+    let total_pixels = (w * h) as usize;
+    if total_pixels == 0 {
+        bail!("Empty depth map matrix");
+    }
+
+    // 1. Gather valid float depth values for quantile computation
+    let mut valid_vals: Vec<f32> = Vec::with_capacity(total_pixels);
+    for y in 0..h {
+        for x in 0..w {
+            let val = *raw_map.at_2d::<f32>(y, x)?;
+            if val.is_finite() && val > -0.5 {
+                valid_vals.push(val);
+            }
+        }
+    }
+
+    if valid_vals.is_empty() {
+        bail!("No valid depth pixels found");
+    }
+
+    valid_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let num_valid = valid_vals.len();
+
+    let min_q = options.clip_min_quantile.clamp(0.0, 0.49);
+    let max_q = options.clip_max_quantile.clamp(0.51, 1.0);
+
+    let min_idx = ((num_valid - 1) as f32 * min_q) as usize;
+    let max_idx = ((num_valid - 1) as f32 * max_q) as usize;
+
+    let v_min = valid_vals[min_idx];
+    let v_max = valid_vals[max_idx];
+    let range = if (v_max - v_min).abs() > 1e-6 { v_max - v_min } else { 1.0 };
+
+    println!(
+        "Post-processing Depth: Clip range [{:.2}, {:.2}] (quantiles {:.1}% - {:.1}%), Gamma={:.2}",
+        v_min, v_max, min_q * 100.0, max_q * 100.0, options.gamma
+    );
+
+    // 2. Clamp, Normalize to [0, 1], and apply Gamma Curve
+    let mut norm_map = Mat::new_rows_cols_with_default(h, w, CV_32F, Scalar::default())?;
+    let gamma_exp = if options.gamma > 0.0 { options.gamma } else { 1.0 };
+
+    for y in 0..h {
+        for x in 0..w {
+            let val = *raw_map.at_2d::<f32>(y, x)?;
+            if val <= -0.5 {
+                *norm_map.at_2d_mut::<f32>(y, x)? = 0.0;
+            } else {
+                let clamped = val.clamp(v_min, v_max);
+                let norm = (clamped - v_min) / range;
+                let final_val = if (gamma_exp - 1.0).abs() > 1e-4 {
+                    norm.powf(gamma_exp)
+                } else {
+                    norm
+                };
+                *norm_map.at_2d_mut::<f32>(y, x)? = final_val;
+            }
+        }
+    }
+
+    // 3. High-pass Photo Detail Blending (for crisp eyes, nose, lips, hair texture)
+    if let Some(src_img) = opt_source_img {
+        if options.detail_weight > 0.0 {
+            println!(
+                "Blending high-pass photo details (detail_weight={:.2})...",
+                options.detail_weight
+            );
+            let target_sz = Size::new(w, h);
+            let hp_detail = extract_high_pass_detail(src_img, target_sz)?;
+            let weight = options.detail_weight;
+
+            for y in 0..h {
+                for x in 0..w {
+                    let base_val = *norm_map.at_2d::<f32>(y, x)?;
+                    let hp_val = *hp_detail.at_2d::<f32>(y, x)?;
+                    let blended = (base_val + weight * hp_val).clamp(0.0, 1.0);
+                    *norm_map.at_2d_mut::<f32>(y, x)? = blended;
+                }
+            }
+        }
+    }
+
+    // 4. Bilateral / Edge-preserving smoothing
+    let mut smooth_map = if options.smooth_radius > 0 {
+        let mut dst = Mat::default();
+        let d = options.smooth_radius * 2 + 1;
+        let sigma_color = 0.1f64;
+        let sigma_space = options.smooth_radius as f64;
+        imgproc::bilateral_filter(
+            &norm_map,
+            &mut dst,
+            d,
+            sigma_color,
+            sigma_space,
+            opencv::core::BORDER_DEFAULT,
+        )?;
+        dst
+    } else {
+        norm_map
+    };
+
+    // 5. CLAHE enhancement (optional)
+    if options.enable_clahe {
+        println!("Applying CLAHE (Contrast Limited Adaptive Histogram Equalization)...");
+        let mut u8_map = Mat::default();
+        smooth_map.convert_to(&mut u8_map, opencv::core::CV_8U, 255.0, 0.0)?;
+
+        let mut clahe_obj = imgproc::create_clahe_def()?;
+        clahe_obj.set_clip_limit(3.0)?;
+        clahe_obj.set_tiles_grid_size(Size::new(8, 8))?;
+
+        let mut clahe_out = Mat::default();
+        clahe_obj.apply(&u8_map, &mut clahe_out)?;
+
+        let mut f32_clahe = Mat::default();
+        clahe_out.convert_to(&mut f32_clahe, CV_32F, 1.0 / 255.0, 0.0)?;
+        smooth_map = f32_clahe;
+    }
+
+    Ok(smooth_map)
+}
+
 /// Estimates the depth map from a single photo using a MiDaS ONNX model.
-pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
+pub fn estimate_depth_single(
+    img: &Mat,
+    model_path: &str,
+    options: &DepthPostProcessOptions,
+) -> Result<Mat> {
     if img.empty() {
         bail!("Input image is empty");
     }
 
-    // 1. Load the ONNX model (in OpenCV 5, read_net_from_onnx takes an engine parameter)
-    let mut net = dnn::read_net_from_onnx(model_path, 0)
+    // 1. Load the ONNX model using OpenCV DNN default engine
+    let mut net = dnn::read_net_from_onnx_def(model_path)
         .map_err(|e| anyhow::anyhow!("Failed to load ONNX model from {}: {}", model_path, e))?;
 
     // 2. Preprocess the image
-    // MiDaS Small model expects 256x256 input
     let target_size = Size::new(256, 256);
     let mut resized = Mat::default();
     imgproc::resize(
@@ -29,7 +248,7 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
         imgproc::INTER_CUBIC,
     )?;
 
-    // MiDaS expects normalized RGB input (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    // MiDaS expects normalized RGB input
     let mut preprocessed = Mat::new_rows_cols_with_default(
         target_size.height,
         target_size.width,
@@ -41,12 +260,10 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
         for x in 0..target_size.width {
             let bgr: opencv::core::Vec3b = *resized.at_2d::<opencv::core::Vec3b>(y, x)?;
 
-            // BGR to RGB and scale to [0, 1]
             let r = (bgr[2] as f32) / 255.0;
             let g = (bgr[1] as f32) / 255.0;
             let b = (bgr[0] as f32) / 255.0;
 
-            // Normalize using ImageNet statistics
             let r_norm = (r - 0.485) / 0.229;
             let g_norm = (g - 0.456) / 0.224;
             let b_norm = (b - 0.406) / 0.225;
@@ -56,13 +273,12 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
         }
     }
 
-    // Create 4D blob from preprocessed image
     let blob = dnn::blob_from_image(
         &preprocessed,
         1.0,
         target_size,
         Scalar::default(),
-        false, // Already swapped BGR to RGB and resized
+        false,
         false,
         CV_32F,
     )?;
@@ -71,11 +287,10 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
     net.set_input(&blob, "", 1.0, Scalar::default())?;
     let mut output = Mat::default();
 
-    // In opencv-rust, net.forward expects a Vector of output blob names
     let out_blob_names = opencv::core::Vector::<String>::new();
     net.forward(&mut output, &out_blob_names)?;
 
-    // 4. Post-process the output
+    // 4. Extract raw depth matrix
     let dims = output.dims();
     let mat_size = output.mat_size();
     let (h, w) = if dims == 3 {
@@ -84,10 +299,7 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
         (mat_size.get(0)?, mat_size.get(1)?)
     };
 
-    let mut depth_map = Mat::new_rows_cols_with_default(h, w, CV_32F, Scalar::default())?;
-    let mut min_val = f32::MAX;
-    let mut max_val = f32::MIN;
-
+    let mut raw_depth = Mat::new_rows_cols_with_default(h, w, CV_32F, Scalar::default())?;
     for y in 0..h {
         for x in 0..w {
             let val = if dims == 3 {
@@ -95,29 +307,12 @@ pub fn estimate_depth_single(img: &Mat, model_path: &str) -> Result<Mat> {
             } else {
                 *output.at_2d::<f32>(y, x)?
             };
-            if val < min_val {
-                min_val = val;
-            }
-            if val > max_val {
-                max_val = val;
-            }
-            *depth_map.at_2d_mut::<f32>(y, x)? = val;
+            *raw_depth.at_2d_mut::<f32>(y, x)? = val;
         }
     }
 
-    // Normalize output depth map to [0, 1] range
-    let diff = max_val - min_val;
-    let scale = if diff.abs() > 1e-5 { 1.0 / diff } else { 1.0 };
-
-    for y in 0..h {
-        for x in 0..w {
-            let val = *depth_map.at_2d::<f32>(y, x)?;
-            let norm_val = (val - min_val) * scale;
-            *depth_map.at_2d_mut::<f32>(y, x)? = norm_val;
-        }
-    }
-
-    Ok(depth_map)
+    // 5. Post-process depth map (quantile clipping, gamma correction, photo detail blending, smoothing, CLAHE)
+    post_process_depth_map(&raw_depth, Some(img), options)
 }
 
 /// Estimates depth from a stereo pair using Stereo Block Matching (StereoBM).
@@ -126,12 +321,12 @@ pub fn estimate_depth_stereo(
     right: &Mat,
     num_disparities: i32,
     block_size: i32,
+    options: &DepthPostProcessOptions,
 ) -> Result<Mat> {
     if left.empty() || right.empty() {
         bail!("One or both stereo images are empty");
     }
 
-    // 1. Convert inputs to grayscale (OpenCV 5 cvt_color takes AlgorithmHint)
     let mut left_gray = Mat::default();
     let mut right_gray = Mat::default();
     imgproc::cvt_color(
@@ -149,55 +344,24 @@ pub fn estimate_depth_stereo(
         AlgorithmHint::ALGO_HINT_DEFAULT,
     )?;
 
-    // 2. Initialize and configure StereoBM (in OpenCV 5, StereoBM is in opencv::stereo)
     let mut stereo = stereo::StereoBM::create(num_disparities, block_size)?;
     let mut disparity = Mat::default();
     stereo.compute(&left_gray, &right_gray, &mut disparity)?;
 
-    // 3. Post-process and normalize disparity to [0, 1]
     let h = disparity.rows();
     let w = disparity.cols();
-    let mut depth_map = Mat::new_rows_cols_with_default(h, w, CV_32F, Scalar::default())?;
-
-    // Disparity values in StereoBM are represented as 16-bit signed integers (CV_16S)
-    // with sub-pixel resolution: actual_disparity = val / 16.0
-    // Invalid disparities are negative (often less than 0 or -16)
-    let mut min_disp = f32::MAX;
-    let mut max_disp = f32::MIN;
+    let mut raw_depth = Mat::new_rows_cols_with_default(h, w, CV_32F, Scalar::default())?;
 
     for y in 0..h {
         for x in 0..w {
             let val = *disparity.at_2d::<i16>(y, x)? as f32 / 16.0;
-            // Filter invalid disparites (represented by values <= 0)
             if val > 0.0 {
-                if val < min_disp {
-                    min_disp = val;
-                }
-                if val > max_disp {
-                    max_disp = val;
-                }
-                *depth_map.at_2d_mut::<f32>(y, x)? = val;
+                *raw_depth.at_2d_mut::<f32>(y, x)? = val;
             } else {
-                *depth_map.at_2d_mut::<f32>(y, x)? = -1.0; // Mark as invalid for now
+                *raw_depth.at_2d_mut::<f32>(y, x)? = -1.0;
             }
         }
     }
 
-    // Normalize valid disparities to [0, 1], invalid ones map to 0.0 (background)
-    let diff = max_disp - min_disp;
-    let scale = if diff.abs() > 1e-5 { 1.0 / diff } else { 1.0 };
-
-    for y in 0..h {
-        for x in 0..w {
-            let val = *depth_map.at_2d::<f32>(y, x)?;
-            if val >= 0.0 {
-                let norm_val = (val - min_disp) * scale;
-                *depth_map.at_2d_mut::<f32>(y, x)? = norm_val;
-            } else {
-                *depth_map.at_2d_mut::<f32>(y, x)? = 0.0; // Map invalid to flat background
-            }
-        }
-    }
-
-    Ok(depth_map)
+    post_process_depth_map(&raw_depth, Some(left), options)
 }
