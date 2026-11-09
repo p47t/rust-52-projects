@@ -1,0 +1,17 @@
+{
+  "name": "tilesplit-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build:wasm": "wasm-pack build --target web",
+    "build": "npm run build:wasm && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "wrangler": "^4.158.0"
+  }
+}

@@ -78,7 +78,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint with warnings a
 - **libavformat-ffi**: Requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
 - **flashcard-app**: Android builds require NDK and cargo-apk (`cargo install cargo-apk`)
 - **media-metadata-explorer**: Uses `libavformat-ffi`; requires FFmpeg dev libraries (`libavformat-dev libavcodec-dev libavutil-dev`) and `libclang-dev`
-- **tilesplit-wasm**: Build with `wasm-pack build --target web`
+- **tilesplit-wasm**: Build WASM with `wasm-pack build --target web`, bundle with Vite (`npm run build`), deploy to Cloudflare Workers (`npm run deploy`)
 - **llm-local-studio-3**: Requires `npm` on PATH to compile the embedded Vite Web UI during compilation
 - **llm-local-studio-4**: Requires `npm` on PATH to compile the embedded Vite Web UI, and `ffmpeg` on PATH to decode and resample audio inputs for whisper.cpp and Gemma 4 audio completions
 - **face-detect**: Requires OpenCV 4.7+ (or 5.x) with development headers and `libclang`
